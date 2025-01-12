@@ -1,0 +1,442 @@
+_gt_report_variable() {
+	local varname; varname="$1"
+	if [ "$test_on" = true ]; then printf >&2 "${varname}: ${(P)varname}\n"; fi
+}
+
+_gt_report_exit_code() {
+	if [ "$exit_report" = true ] && [ "$1" -ne 0 ]; then
+		printf >&2 "exit code: $1\n"
+	fi
+}
+
+# input
+# 	$1 - starting shortcut folder
+# printf - all shortcut files absolute paths
+# return 3 - shortcut file not found in shortcut folder
+# return 4 - resource opening method not found in shortcut file
+_gt_get_files_starting_at_folder() {
+	if [ -z "$1" ]; then
+		printf >&2 "shortcut is empty\n"
+		return 253
+	fi
+	
+	local this_folder_abs; this_folder_abs="$1"
+	local this_file_abs; this_file_abs="${this_folder_abs}/$( basename "$1" ).gt"
+	if ! [ -f "$this_file_abs" ]; then
+		printf >&2 "shortcut file '$this_file_abs' not found under specified folder '$1'\n"
+		return 3
+	fi
+
+	local shortcut_opening_method_code; shortcut_opening_method_code="$( awk 'NR == 2 { print }' "$this_file_abs" )"
+	if [ -z "$shortcut_opening_method_code" ]; then
+		printf >&2 "shortcut file '$this_file_abs' is missing opening method.\n"
+		return 4
+	fi
+
+	local self_opening_method_code children_opening_method_code
+	self_opening_method_code="${shortcut_opening_method_code%+*}"
+	children_opening_method_code="${shortcut_opening_method_code#*+}"
+
+	# print own shortcut file absolute path so long as opening method code for self isn't 'n'
+	local recursive_files_abs=()
+	if [ "${self_opening_method_code}" != 'n' ]; then
+		recursive_files_abs+=("$this_file_abs")
+	fi
+
+	# if children also specified, then also recursively add children file absolute paths
+	# _gt_report_variable shortcut_opening_method_code
+	if [ "${children_opening_method_code}" = 'ca' ]; then # get all children (ignoring ones with 'n' as opening method code)
+		local children_folders_abs each_child_folder_abs 
+		children_folders_abs=( $( find ${this_folder_abs}/* -maxdepth 0 -type d ) )
+		for each_child_folder_abs in ${children_folders_abs[@]}; do
+			recursive_files_abs+=( $( _gt_get_files_starting_at_folder "$each_child_folder_abs" ) ) || return $?
+		done
+	elif [[ "${children_opening_method_code}" =~ ^cb ]]; then # get all but the specified children (still ignoring ones with 'n' as opening method code)
+		local default_ifs excluded_children_keys each_excluded_key
+		default_ifs="$IFS"
+		IFS=':'
+		excluded_children_keys=()
+		read -A excluded_children_keys <<< "${children_opening_method_code#*:}"
+		IFS="$default_ifs"
+		# _gt_report_variable excluded_children_keys
+		children_folders_abs=( $( find ${this_folder_abs}/* -maxdepth 0 -type d ) )
+		local each_key each_key_index_in_excluded_keys
+		for each_child_folder_abs in ${children_folders_abs[@]}; do
+			each_key="$( basename "$each_child_folder_abs" )"
+			each_key_index_in_excluded_keys="${excluded_children_keys[(Ie)${each_key}]}"
+			# _gt_report_variable each_key
+			# _gt_report_variable each_key_index_in_excluded_keys
+			# make sure to use (Ie) instead of (ie), so that the no-match index is 0
+			if [ ${excluded_children_keys[(Ie)${each_key}]} -eq 0 ]; then # if the key is NOT excluded, then add its children
+				# _gt_report_variable each_key
+				recursive_files_abs+=( $( _gt_get_files_starting_at_folder "$each_child_folder_abs" ) ) || return $?
+			fi
+		done
+	elif [[ "${children_opening_method_code}" =~ ^co ]]; then # get only specified children (ignoring ones with 'n' as opening method code)
+		local default_ifs included_children_keys each_included_key
+		default_ifs="$IFS"
+		IFS=':'
+		included_children_keys=()
+		read -A included_children_keys <<< "${children_opening_method_code#*:}"
+		IFS="$default_ifs"
+		for each_included_key in ${included_children_keys[@]}; do
+			if ! [ -d "$this_folder_abs/$each_included_key" ]; then
+				printf >&2 "The key '$each_included_key' does not exist under the shortcut '$( basename "$this_folder_abs" )'\n"
+				return 1
+			fi
+			recursive_files_abs+=( $( _gt_get_files_starting_at_folder "$this_folder_abs/$each_included_key" ) ) || return $?
+		done
+	fi
+	printf "${recursive_files_abs[*]}"
+}
+
+
+# input:
+#   either
+# 	-p ${@:2} where ${@:2} are all shortcut files to preview
+#   or
+# 	-pi ${{@:2} where ${@:2} is the one shortcut file to preview
+#   or
+# 	-i ${{@:2} where ${@:2} is the one all shortcut file to open
+#   or
+# 	$@ - all shortcut files to open
+#	since this takes input from _gt_get_files_starting_at_folder, which already checks if each file exists, this function doesn't check for file existence.
+# 	we will filter again to exclude when shortcut is empty or opening method is 'n', since it is only consistent with the API.
+# return 3 - shortcut file not found in shortcut folder
+# return 4 - resource information not found in shortcut file
+# return 0 - successfully open all specified shortcuts
+_gt_open_resources_from_files() {
+	# declare arrays for each opening method
+	## files
+	local vim_shortcut_resources=()
+	local vim_shortcut_descriptions=()
+	local vim_shortcut_keypaths=()
+
+	local textedit_shortcut_resources=()
+	local textedit_shortcut_descriptions=()
+	local textedit_shortcut_keypaths=()
+
+	local open_shortcut_resources=()
+	local open_shortcut_descriptions=()
+	local open_shortcut_keypaths=()
+
+	## dirs
+	local cd_shortcut_resources=()
+	local cd_shortcut_descriptions=()
+	local cd_shortcut_keypaths=()
+
+	local finder_shortcut_resources=()
+	local finder_shortcut_descriptions=()
+	local finder_shortcut_keypaths=()
+
+	## links
+	local bi_shortcut_resources=()
+	local bi_shortcut_descriptions=()
+	local bi_shortcut_keypaths=()
+
+	# parse for preview mode first and shift the rest of the args
+	local absolute_open=off
+	local preview_mode=off
+	if [ "$1" = '-p' ]; then
+		shift
+		preview_mode=on
+		printf "= Preview Mode =\n"
+	elif [ "$1" = '-pi' ]; then
+		shift
+		absolute_open=on
+		preview_mode=on
+		printf "= Preview Mode =\n"
+	elif [ "$1" = '-i' ]; then
+		shift
+		absolute_open=on
+	fi
+
+	# parse each shortcut file to populate shortcut info arrays
+	if [ $# -eq 0 ]; then
+		printf "No shortcuts to be opened.\n"
+		return
+	fi
+
+	local gt_dir=/Users/qzhang/.gt
+	local current_shortcut_file current_shortcut_resources current_shortcut_keypath current_resource current_opening_method_code current_hyphenated_description current_resource_extension
+	local current_resource_no_http
+	local number_of_shortcut_fields=3
+	local number_of_pieces_of_info_per_shortcut=2
+	local domain_name_regex; domain_name_regex='.\.[a-zA-Z]{2,3}'
+	local process_current_resource
+	while [ $# -gt 0 ]; do
+		current_shortcut_file="$1"
+		# _gt_report_variable current_shortcut_file
+		current_shortcut_keypath="root/${current_shortcut_file#${gt_dir}/}"
+		current_shortcut_keypath="${current_shortcut_keypath%/$(basename $current_shortcut_keypath)}"
+		current_shortcut_keypath_display="${current_shortcut_keypath//\// -> }"
+		current_shortcut_resources=( $( cat "$current_shortcut_file" ) )
+		if [ "${#current_shortcut_resources}" -ne "$number_of_shortcut_fields" ]; then
+			printf >&2 "Incorrect resource information in shortcut file '$current_shortcut_file': expected $number_of_shortcut_fields fields but got ${#current_shortcut_resources} fields.\n"
+			return 4
+		fi
+		
+		current_resource="${current_shortcut_resources[1]}"
+		current_opening_method_code="${current_shortcut_resources[2]}"
+		current_self_opening_method="${current_opening_method_code%+*}"
+		current_hyphenated_description="${current_shortcut_resources[3]}"
+
+		current_resource_no_http="${current_resource#https://}"
+		current_resource_no_http="${current_resource_no_http#http://}"
+
+		# if resource has a dot, extract extension; else set extension to empty string
+		current_resource_extension=''
+		if [[ "$( basename "${current_resource}" )" =~ \\. ]]; then
+			current_resource_extension="${current_resource##*.}" # ## to remove longest matching prefix
+		fi
+
+		# determine whether to process the current resource at all
+		process_current_resource=no
+		if [ "$absolute_open" = on ]; then
+			process_current_resource=yes
+		elif [ "$current_resource" != '-' ] && [ "$current_self_opening_method" != 'n' ]; then
+			process_current_resource=yes
+		fi
+
+		# if do not process current resource, skip this while iter
+		if [ "$process_current_resource" = no ]; then
+			continue
+		fi
+		
+		if [ -d "$current_resource" ]; then
+			if [ "$current_self_opening_method" = 'cd' ]; then
+				cd_shortcut_resources+=( "$current_resource" )
+				cd_shortcut_descriptions+=( "$current_hyphenated_description" )
+				cd_shortcut_keypaths+=( "$current_shortcut_keypath" )
+			else
+				case "$current_resource_extension" in
+					xcodeproj) ## add here folder extensions that should be opened by special apps
+						open_shortcut_resources+=( "$current_resource" )
+						open_shortcut_descriptions+=( "$current_hyphenated_description" )
+						open_shortcut_keypaths+=( "$current_shortcut_keypath" )
+						;;
+					*)
+						finder_shortcut_resources+=( "$current_resource" )
+						finder_shortcut_descriptions+=( "$current_hyphenated_description" )
+						finder_shortcut_keypaths+=( "$current_shortcut_keypath" )
+						;;
+				esac
+			fi
+		elif [ -f "$current_resource" ]; then
+			case "$current_resource_extension" in
+				''|csv) 
+					vim_shortcut_resources+=( "$current_resource" )
+					vim_shortcut_descriptions+=( "$current_hyphenated_description" )
+					vim_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+				txt|rtf|rtfd)
+					textedit_shortcut_resources+=( "$current_resource" )
+					textedit_shortcut_descriptions+=( "$current_hyphenated_description" )
+					textedit_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+				*) 
+					open_shortcut_resources+=( "$current_resource" )
+					open_shortcut_descriptions+=( "$current_hyphenated_description" )
+					open_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+			esac
+		elif [[ "${current_resource_no_http%%/*}" =~ $domain_name_regex ]]; then
+			# see domain_name_regex: resource is link if: it isn't file or folder AND its pre-slash portion is of the format <something>.<letter>{2,3}
+			case "$current_self_opening_method" in
+				-|bi) 
+					bi_shortcut_resources+=( "$current_resource" )
+					bi_shortcut_descriptions+=( "$current_hyphenated_description" )
+					bi_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+				*)
+					printf >&2 "Unknown opening method '$current_self_opening_method' for shortcut at ${current_shortcut_keypath_display}\n"
+					return 6
+					;;
+			esac
+		else
+			printf "The resource '$current_resource' for the shortcut at '$current_shortcut_keypath_display' cannot be parsed into a known category.\n"
+			return 5
+		fi
+
+		shift # at the end so that we work with $1 first
+	done
+
+	# check if there are multiple 'cd'-method shortcuts
+	if [ "${#cd_shortcut_resources}" -gt 1 ]; then
+		printf "Cannot cd to multiple directories:\n"
+		printf "${cd_shortcut_resources[@]}\n"
+		return 8
+	fi
+	# check if there is exactly one directory to open for finder and none for cd. if so, move that dir to cd list.
+	if [ -z "$cd_shortcut_resources" ] && [ "$#finder_shortcut_resources" -eq 1 ]; then
+		cd_shortcut_resources=( ${finder_shortcut_resources[@]} )
+		cd_shortcut_descriptions=( ${finder_shortcut_descriptions[@]} )
+		cd_shortcut_keypaths=( ${finder_shortcut_keypaths[@]} )
+		finder_shortcut_resources=()
+		finder_shortcut_descriptions=()
+		finder_shortcut_keypaths=()
+	fi
+
+	# one opener at a time, open all added resources
+	local this_method_each_description this_method_index this_method_each_description_display s
+	## open using apps external to the command line first
+	if [ "$#open_shortcut_resources" -gt 0 ]; then
+		if [ "$#open_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#open_shortcut_resources} file${s} with the default app for each\n"
+		this_method_index=1
+		for this_method_each_description in "${open_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${open_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${open_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			open ${open_shortcut_resources[@]} || return $?
+		fi
+	fi
+	if [ "$#textedit_shortcut_resources" -gt 0 ]; then
+		if [ "$#textedit_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#textedit_shortcut_resources} file${s} in TextEdit\n"
+		this_method_index=1
+		for this_method_each_description in "${textedit_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${textedit_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${textedit_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			open -e ${textedit_shortcut_resources[@]} || return $?
+		fi
+	fi
+	if [ "$#bi_shortcut_resources" -gt 0 ]; then
+		if [ "$#bi_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#bi_shortcut_resources} link${s} in incognito\n"
+		this_method_index=1
+		for this_method_each_description in "${bi_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${bi_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${bi_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			# open -na 'Brave Browser' --args --incognito ${bi_shortcut_resources[@]} || return $?
+		fi
+	fi
+	if [ "$#finder_shortcut_resources" -gt 0 ]; then
+		if [ "$#finder_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#finder_shortcut_resources} folder${s} in Finder\n"
+		this_method_index=1
+		for this_method_each_description in "${finder_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${finder_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${finder_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			open ${finder_shortcut_resources[@]}
+		fi
+	fi
+	## then change directory
+	if [ "$#cd_shortcut_resources" -gt 0 ]; then
+		this_method_each_description_display=''
+		if ! [ "${cd_shortcut_descriptions[1]}" = '-' ]; then
+			this_method_each_description_display=": ${cd_shortcut_descriptions[1]//-/ }"
+		else
+			this_method_each_description_display=": ${cd_shortcut_resources[1]}"
+		fi
+		printf "cd to ${cd_shortcut_keypaths[1]//\// -> }${this_method_each_description_display}\n"
+		if [ "$preview_mode" = 'off' ]; then
+			cd ${cd_shortcut_resources[1]}
+		fi
+	fi
+	## then open all appropriate files using vim
+	if [ "$#vim_shortcut_resources" -gt 0 ]; then
+		if [ "$#vim_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#vim_shortcut_resources} file${s} in vim\n"
+		this_method_index=1
+		for this_method_each_description in "${vim_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${vim_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${vim_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			vim -p ${vim_shortcut_resources[@]}
+		fi
+	fi
+}
+
+gt() {
+	local test_on; test_on=true
+	local exit_report; exit_report=true
+	local gt_helper_absolute_path; gt_helper_absolute_path='/Users/qzhang/.qrc/scripts/_gt_helper'
+
+	if [ "$1" = "-h" ]; then
+		printf "$( $gt_helper_absolute_path "$@" )" | less -R
+		return 0
+	fi
+
+	local shortcut_folder_abspath
+	local open_only_itself=false
+	if [ "$1" = '-p' ]; then
+		if [ "$2" = '-i' ]; then
+			open_only_itself=true
+			shortcut_folder_abspath="$( $gt_helper_absolute_path "${@:3}" )"
+		else
+			shortcut_folder_abspath="$( $gt_helper_absolute_path "${@:2}" )"
+		fi
+	elif [ "$1" = '-i' ]; then
+		open_only_itself=true
+		shortcut_folder_abspath="$( $gt_helper_absolute_path "${@:2}" )"
+	else
+		shortcut_folder_abspath="$( $gt_helper_absolute_path "$@" )"
+	fi
+	exit_code="$?"
+	if [ "$exit_code" -eq 100 ]; then
+		# _gt_report_variable shortcut_folder_abspath
+		local files_of_shortcuts_to_open=()
+		if [ "$open_only_itself" = true ]; then
+			files_of_shortcuts_to_open=( "${shortcut_folder_abspath%/}/$( basename "$shortcut_folder_abspath" ).gt" ) || _gt_report_exit_code "$?"
+		else
+			files_of_shortcuts_to_open=( $( _gt_get_files_starting_at_folder "$shortcut_folder_abspath" ) ) || _gt_report_exit_code "$?"
+		fi
+		# _gt_report_variable files_of_shortcuts_to_open
+		if [ "$1" = '-p' ]; then
+			if [ "$open_only_itself" = true ]; then
+				_gt_open_resources_from_files -pi ${files_of_shortcuts_to_open[@]} || _gt_report_exit_code "$?"
+			else
+				_gt_open_resources_from_files -p ${files_of_shortcuts_to_open[@]} || _gt_report_exit_code "$?"
+			fi
+		else
+			if [ "$open_only_itself" = true ]; then
+				_gt_open_resources_from_files -i ${files_of_shortcuts_to_open[@]} || _gt_report_exit_code "$?"
+			else
+				_gt_open_resources_from_files ${files_of_shortcuts_to_open[@]} || _gt_report_exit_code "$?"
+			fi
+		fi
+	else
+		_gt_report_exit_code "$exit_code"
+	fi
+}
+
+gt "$@"

@@ -1,0 +1,19 @@
+#!/bin/zsh
+
+set -v
+
+cp -i ~/.qrc/functions/gt .
+cp -i ~/.qrc/scripts/_gt_helper .
+cp -i ~/.qrc/completions/_gt .
+
+sed -i '' 's|,.wf|    |' _gt_helper
+sed -i '' '/\.md/d' _gt_helper
+sed -i '' '/Brave/d' _gt_helper
+
+set +v
+
+echo
+echo 'For gt:'
+echo '  remember to remove all wf, md, bp, bs resource arrays and parsers'
+echo '  keep the bi arrays but comment out the bi opening line'
+echo

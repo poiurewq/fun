@@ -1,0 +1,65 @@
+#compdef gt
+
+local last_word 
+last_word="${words[$((CURRENT-1))]}"
+
+if [ "${last_word}" = 'here' ]; then
+	_files
+else
+	local gt_dir gt_helper 
+	gt_dir=/Users/qzhang/.gt
+	gt_helper=/Users/qzhang/.qrc/scripts/_gt_helper
+
+	local option_u_index option_n_index option_p_index option_e_index option_s_index
+	option_u_index="${words[(Ie)-u]}" # find (1-based) index of the last instance of -u
+	option_n_index="${words[(Ie)-n]}"
+	option_p_index="${words[(Ie)-p]}"
+	option_e_index="${words[(Ie)-e]}"
+	option_s_index="${words[(Ie)-s]}"
+	option_t_index="${words[(Ie)-t]}"
+
+	local current_level_options=()
+	if [ $option_u_index -gt 0 ]; then
+		if [ "$option_u_index" -eq $((CURRENT-1)) ]; then
+			current_level_options=( $( cd $gt_dir && echo * ) )
+		elif [ "$option_u_index" -lt $CURRENT ]; then
+			current_level_options=( $( $gt_helper -c ${words:${option_u_index}:$((CURRENT - option_u_index - 1))} ) )
+		fi
+	elif [ $option_n_index -gt 0 ]; then
+		:
+	elif [ $option_p_index -gt 0 ] || [ $option_e_index -gt 0 ] || [ $option_s_index -gt 0 ] || [ $option_t_index -gt 0 ]; then
+		if [ $CURRENT -eq 3 ]; then
+			current_level_options=( $( cd $gt_dir && echo * ) )
+		elif [ $CURRENT -gt 3 ]; then
+			current_level_options=( $( $gt_helper -c ${words:2:$((CURRENT - 3))} ) )
+		fi
+	elif [ $CURRENT -eq 2 ]; then
+		current_level_options=( $( cd $gt_dir && echo * ) )
+	elif [ $CURRENT -gt 2 ]; then
+		current_level_options=( $( $gt_helper -c ${words:1:$((CURRENT - 2))} ) )
+	fi
+
+	if [ "$#current_level_options" -gt 0 ]; then
+		local clo_each clo_match_prefix=()
+		for clo_each in ${current_level_options[@]}; do
+			if [[ $clo_each =~ ^$PREFIX ]]; then
+				clo_match_prefix+=( $clo_each )
+			fi
+		done
+		if [ "$#clo_match_prefix" -gt 0 ]; then
+			compadd ${clo_match_prefix[@]}
+		else
+			local all_options=()
+			all_options=( $( find $gt_dir -type d -mindepth 1 -exec basename {} ';' | uniq ) )
+			local ao_each ao_match_prefix=()
+			for ao_each in ${all_options[@]}; do
+				if [[ $ao_each =~ ^$PREFIX ]]; then
+					ao_match_prefix+=( $ao_each )
+				fi
+			done
+			compadd ${ao_match_prefix[@]}
+		fi
+	else
+		compadd $( find $gt_dir -type d -mindepth 1 -exec basename {} ';' | uniq )
+	fi
+fi
