@@ -237,15 +237,10 @@ _gt_open_resources_from_files() {
 					vim_shortcut_descriptions+=( "$current_hyphenated_description" )
 					vim_shortcut_keypaths+=( "$current_shortcut_keypath" )
 					;;
-				txt|rtf|rtfd)
+				txt|rtf|rtfd|wf)
 					textedit_shortcut_resources+=( "$current_resource" )
 					textedit_shortcut_descriptions+=( "$current_hyphenated_description" )
 					textedit_shortcut_keypaths+=( "$current_shortcut_keypath" )
-					;;
-				md)
-					bp_shortcut_resources+=( "$current_resource" )
-					bp_shortcut_descriptions+=( "$current_hyphenated_description" )
-					bp_shortcut_keypaths+=( "$current_shortcut_keypath" )
 					;;
 				*) 
 					open_shortcut_resources+=( "$current_resource" )
@@ -354,7 +349,43 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Brave Browser' --args --incognito ${bi_shortcut_resources[@]} || return $?
+			open -na 'Google Chrome' --args --incognito ${bi_shortcut_resources[@]} || return $?
+		fi
+	fi
+	if [ "$#bp_shortcut_resources" -gt 0 ]; then
+		if [ "$#bp_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#bp_shortcut_resources} link${s} in personal account\n"
+		this_method_index=1
+		for this_method_each_description in "${bp_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${bp_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${bp_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			# open -na 'Google Chrome' --args --profile-directory="Profile 1" ${bp_shortcut_resources[@]} || return $?
+		fi
+	fi
+	if [ "$#bs_shortcut_resources" -gt 0 ]; then
+		if [ "$#bs_shortcut_resources" -gt 1 ]; then s='s'; else s=''; fi
+		printf "opening ${#bs_shortcut_resources} link${s} in school account\n"
+		this_method_index=1
+		for this_method_each_description in "${bs_shortcut_descriptions[@]}"; do
+			this_method_each_description_display=''
+			if ! [ "$this_method_each_description" = '-' ]; then
+				this_method_each_description_display=": ${this_method_each_description//-/ }"
+			else
+				this_method_each_description_display=": ${bs_shortcut_resources[${this_method_index}]}"
+			fi
+			printf "  ${bs_shortcut_keypaths[${this_method_index}]//\// -> }${this_method_each_description_display}\n"
+			(( this_method_index++ ))
+		done
+		if [ "$preview_mode" = 'off' ]; then
+			# open -na 'Google Chrome' --args --profile-directory="Default" ${bs_shortcut_resources[@]} || return $?
 		fi
 	fi
 	if [ "$#finder_shortcut_resources" -gt 0 ]; then

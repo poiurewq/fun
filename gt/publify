@@ -12,6 +12,7 @@ sed -i '' 's|/Users/qzhang/.gt|GT_ROOTDIR|' _gt
 sed -i '' 's|,.wf|    |' _gt_helper
 sed -i '' '/\.md/d' _gt_helper
 sed -i '' '/Brave/d' _gt_helper
+sed -i '' 's|Brave Browser|Google Chrome|' gt
 
 set +v
 
