@@ -1,7 +1,9 @@
 # about
 
+## purpose
 **gt** defines, maintains, and **g**oes **t**o shortcuts to resources, whether they be files on your computer or links to websites. 
 
+## "release" notes
 currently, **gt** does not support opening links using your own browser. you can ask me to set it up for you in 5 minutes or you can wait for a generalized update that sets it up for you.
 
 also, **gt** only currently supports zsh, which is the default shell on MacOS. to adapt it to other shells, you'll mostly just need to change the array syntax wherever it's used. with zsh, you'll also get autocomplete; with other shells, your autocomplete won't work. by convention in this document we'll name the directory containing our scripts 'bin'. you can name it whatever you want. if you want the folder to be hidden, add a dot '.' before the name.
