@@ -134,6 +134,14 @@ _gt_open_resources_from_files() {
 	local bi_shortcut_descriptions=()
 	local bi_shortcut_keypaths=()
 
+	local bp_shortcut_resources=()
+	local bp_shortcut_descriptions=()
+	local bp_shortcut_keypaths=()
+
+	local bs_shortcut_resources=()
+	local bs_shortcut_descriptions=()
+	local bs_shortcut_keypaths=()
+
 	# parse for preview mode first and shift the rest of the args
 	local absolute_open=off
 	local preview_mode=off
@@ -234,6 +242,11 @@ _gt_open_resources_from_files() {
 					textedit_shortcut_descriptions+=( "$current_hyphenated_description" )
 					textedit_shortcut_keypaths+=( "$current_shortcut_keypath" )
 					;;
+				md)
+					bp_shortcut_resources+=( "$current_resource" )
+					bp_shortcut_descriptions+=( "$current_hyphenated_description" )
+					bp_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
 				*) 
 					open_shortcut_resources+=( "$current_resource" )
 					open_shortcut_descriptions+=( "$current_hyphenated_description" )
@@ -247,6 +260,16 @@ _gt_open_resources_from_files() {
 					bi_shortcut_resources+=( "$current_resource" )
 					bi_shortcut_descriptions+=( "$current_hyphenated_description" )
 					bi_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+				bp) 
+					bp_shortcut_resources+=( "$current_resource" )
+					bp_shortcut_descriptions+=( "$current_hyphenated_description" )
+					bp_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+				bs)
+					bs_shortcut_resources+=( "$current_resource" )
+					bs_shortcut_descriptions+=( "$current_hyphenated_description" )
+					bs_shortcut_keypaths+=( "$current_shortcut_keypath" )
 					;;
 				*)
 					printf >&2 "Unknown opening method '$current_self_opening_method' for shortcut at ${current_shortcut_keypath_display}\n"
@@ -331,7 +354,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			# open -na 'Brave Browser' --args --incognito ${bi_shortcut_resources[@]} || return $?
+			open -na 'Brave Browser' --args --incognito ${bi_shortcut_resources[@]} || return $?
 		fi
 	fi
 	if [ "$#finder_shortcut_resources" -gt 0 ]; then
@@ -389,7 +412,7 @@ _gt_open_resources_from_files() {
 gt() {
 	local test_on; test_on=true
 	local exit_report; exit_report=true
-	local gt_helper_absolute_path; gt_helper_absolute_path='/Users/qzhang/.qrc/scripts/_gt_helper'
+	local gt_helper_absolute_path; gt_helper_absolute_path='GT_HELPER_ABSPATH'
 
 	if [ "$1" = "-h" ]; then
 		printf "$( $gt_helper_absolute_path "$@" )" | less -R

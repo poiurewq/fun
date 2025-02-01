@@ -7,8 +7,8 @@ if [ "${last_word}" = 'here' ]; then
 	_files
 else
 	local gt_dir gt_helper 
-	gt_dir=/Users/qzhang/.gt
-	gt_helper=/Users/qzhang/.qrc/scripts/_gt_helper
+	gt_dir=GT_ROOTDIR
+	gt_helper=GT_HELPER_ABSPATH
 
 	local option_u_index option_n_index option_p_index option_e_index option_s_index
 	option_u_index="${words[(Ie)-u]}" # find (1-based) index of the last instance of -u
