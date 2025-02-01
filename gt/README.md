@@ -6,7 +6,7 @@ type the following commands in your terminal
 
 ```
 cd
-mkdir bin
+mkdir -p bin
 cd bin
 curl https://raw.githubusercontent.com/poiurewq/fun/refs/heads/main/gt/gt > gt
 curl https://raw.githubusercontent.com/poiurewq/fun/refs/heads/main/gt/_gt_helper > _gt_helper
