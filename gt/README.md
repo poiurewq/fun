@@ -39,3 +39,6 @@ exec $SHELL
 type `gt` to start using the script!
 
 To start, you'll want to set up a few shortcuts to resources using the `gt -n` flag.
+
+If you want to get the path to a file from Finder, toggle on the path view with the keyboard shortcut `Option-Command-P`, then right-click on the file name in the path that shows up at the bottom of the Finder window and choose `Copy <file> as Pathname`.
+
