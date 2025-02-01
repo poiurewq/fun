@@ -14,7 +14,7 @@ curl https://raw.githubusercontent.com/poiurewq/fun/refs/heads/main/gt/_gt > _gt
 chmod u+x _gt_helper
 ```
 
-then add the following lines to .zshrc
+then add the following lines to a file named `.zshrc` in your home directory, so its path would be: `~/.zshrc`
 
 ```
 typeset -TU FPATH=$HOME/bin:$FPATH fpath
