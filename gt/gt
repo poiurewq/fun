@@ -165,7 +165,7 @@ _gt_open_resources_from_files() {
 		return
 	fi
 
-	local gt_dir=/Users/qzhang/.gt
+	local gt_dir=GT_ROOTDIR
 	local current_shortcut_file current_shortcut_resources current_shortcut_keypath current_resource current_opening_method_code current_hyphenated_description current_resource_extension
 	local current_resource_no_http
 	local number_of_shortcut_fields=3
@@ -241,6 +241,11 @@ _gt_open_resources_from_files() {
 					textedit_shortcut_resources+=( "$current_resource" )
 					textedit_shortcut_descriptions+=( "$current_hyphenated_description" )
 					textedit_shortcut_keypaths+=( "$current_shortcut_keypath" )
+					;;
+				md)
+					bp_shortcut_resources+=( "$current_resource" )
+					bp_shortcut_descriptions+=( "$current_hyphenated_description" )
+					bp_shortcut_keypaths+=( "$current_shortcut_keypath" )
 					;;
 				*) 
 					open_shortcut_resources+=( "$current_resource" )
