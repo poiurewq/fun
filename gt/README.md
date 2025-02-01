@@ -23,29 +23,19 @@ curl https://raw.githubusercontent.com/poiurewq/fun/refs/heads/main/gt/_gt > _gt
 curl https://raw.githubusercontent.com/poiurewq/fun/refs/heads/main/gt/gt_setup > gt_setup
 chmod u+x _gt_helper
 source gt_setup
+zshrc_file="$HOME/.zshrc"
+if [ -z $(grep 'GT-PATH-SETUP' $HOME/.zshrc) ]; then
+echo '# GT-PATH-SETUP' >> $zshrc_file
+echo 'typeset -TU FPATH=$HOME/bin:$FPATH fpath' >> $zshrc_file
+echo 'autoload gt' >> $zshrc_file
+echo 'typeset -TU PATH=$HOME/bin:$PATH path' >> $zshrc_file
+echo 'autoload -U compinit; compinit' >> $zshrc_file
+fi
+unset zshrc_file
+exec $SHELL
 ```
 
 ## step 2
-then add the following lines to a file named `.zshrc` in your home directory, so its path would be: `~/.zshrc`
-
-to open the file, you can type these lines to open the file using the command-line file editor Vi:
-```
-vi ~/.zshrc
-```
-
-## step 3
-then type `Gi` (you will not see the letters show up, these letters simply let you insert at the end of the file). then copy & paste these lines into the file:
-```
-typeset -TU FPATH=$HOME/bin:$FPATH fpath
-autoload gt
-typeset -TU PATH=$HOME/bin:$PATH path
-autoload -U compinit; compinit
-```
-
-then press the `Esc` key and type `:wq`, which saves the file and quits the editor.
-
-## step 4
-reload the shell by restarting terminal or typing `exec $SHELL`
-
-## step 5
 type `gt` to start using the script!
+
+To start, you'll want to set up a few shortcuts to resources using the `gt -n` flag.
