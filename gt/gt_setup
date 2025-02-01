@@ -1,5 +1,6 @@
 gt_helper_abspath="$(pwd)/_gt_helper"
 sed -i '' "s|GT_HELPER_ABSPATH|${gt_helper_abspath}|" gt
 sed -i '' "s|GT_HELPER_ABSPATH|${gt_helper_abspath}|" _gt
+sed -i '' "s|GT_ROOTDIR|${HOME}/.gt|" gt
 sed -i '' "s|GT_ROOTDIR|${HOME}/.gt|" _gt
 unset gt_helper_abspath

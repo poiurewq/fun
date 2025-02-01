@@ -7,6 +7,7 @@ cp ~/.qrc/scripts/_gt_helper .
 cp ~/.qrc/completions/_gt .
 
 sed -i '' 's|/Users/qzhang/.qrc/scripts/_gt_helper|GT_HELPER_ABSPATH|' gt
+sed -i '' 's|/Users/qzhang/.gt|GT_ROOTDIR|' gt
 sed -i '' 's|/Users/qzhang/.qrc/scripts/_gt_helper|GT_HELPER_ABSPATH|' _gt
 sed -i '' 's|/Users/qzhang/.gt|GT_ROOTDIR|' _gt
 sed -i '' 's|,.wf|    |' _gt_helper
