@@ -8,9 +8,21 @@ bf=$(tput bold)
 uf=$(tput smul)
 
 read -d '' GT_SYN_VAR << GT_SYNOPSIS
-     ${bf}gt${nf} [[${bf}-p${nf}] [${bf}-i${nf}] ${uf}keypath${nf}] [${bf}-s${nf} ${uf}keypath${nf}] [${bf}-t${nf} [${uf}keypath${nf}]] [${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]]
-        [${bf}-n${nf} ${uf}key${nf} {${uf}resource${nf}|${bf}here${nf} [${uf}file${nf}]} [${bf}-u${nf} ${uf}keypath${nf}] [${bf}-d${nf} ${uf}description${nf}] [${bf}-o${nf} ${uf}method${nf}]]
-        [${bf}-e${nf} ${uf}keypath${nf} [${bf}-k${nf} ${uf}key${nf}] [${bf}-r${nf} ${uf}resource${nf}|${bf}here${nf} [${uf}file${nf}]|${bf}empty${nf}] [${bf}-u${nf} {${bf}root${nf}|${uf}parent-keypath${nf}}] [${bf}-d${nf} ${uf}description${nf}|${bf}empty${nf}] [${bf}-o${nf} ${uf}method${nf}|${bf}empty${nf}]]
+     ${bf}gt${nf}
+        [[${bf}-p${nf}] [${bf}-i${nf}] ${uf}keypath${nf}]
+        [${bf}-s${nf} ${uf}keypath${nf}]
+        [${bf}-t${nf} [${uf}keypath${nf}]]
+        [${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]]
+        [${bf}-n${nf} ${uf}key${nf} {${uf}resource${nf}|${bf}here${nf} [${uf}file${nf}]}
+                [${bf}-u${nf} ${uf}keypath${nf}]
+                [${bf}-d${nf} ${uf}description${nf}]
+                [${bf}-o${nf} ${uf}method${nf}]]
+        [${bf}-e${nf} ${uf}keypath${nf}
+                [${bf}-k${nf} ${uf}key${nf}]
+                [${bf}-r${nf} ${uf}resource${nf}|${bf}here${nf} [${uf}file${nf}]|${bf}empty${nf}]
+                [${bf}-u${nf} {${bf}root${nf}|${uf}parent-keypath${nf}}]
+                [${bf}-d${nf} ${uf}description${nf}|${bf}empty${nf}]
+                [${bf}-o${nf} ${uf}method${nf}|${bf}empty${nf}]]
 GT_SYNOPSIS
 
 read -d '' GT_MAN_VAR << GT_MANUAL
@@ -393,19 +405,14 @@ while ! [ -z "$1" ]; do
 				exit "$exit_code"
 			fi
 
-			ste_resources=( $( cat "${ste_folder}/$( basename $ste_folder ).gt" ) )
-			number_of_shortcut_fields=3
-			if [ "${#ste_resources}" -ne "$number_of_shortcut_fields" ]; then
-				printf >&2 "Incorrect resource information in shortcut file '$ste_folder': expected $number_of_shortcut_fields fields but got ${#ste_resources} fields.\n"
-				return 4
-			fi
+			ste_abpath="${ste_folder}/$( basename $ste_folder ).gt"
 
 			# note description fields will be space-ified to compare prev vs. new
 			prev_parent_dir="$( dirname "$ste_folder" )"
 			prev_key="$( basename "$ste_folder" )"
-			prev_resource="${ste_resources[1]}"
-			prev_opening_method_code="${ste_resources[2]}"
-			prev_description="${ste_resources[3]//-/ }"
+			prev_resource="$( awk 'NR == 1 { print }' "$ste_abpath" )"
+			prev_opening_method_code="$( awk 'NR == 2 { print }' "$ste_abpath" )"
+			prev_description="$( awk 'NR == 3 { print }' "$ste_abpath" )"
 
 			new_parent_dir="$prev_parent_dir"
 			new_key="$prev_key"

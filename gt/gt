@@ -95,9 +95,9 @@ _gt_get_files_starting_at_folder() {
 #   either
 # 	-p ${@:2} where ${@:2} are all shortcut files to preview
 #   or
-# 	-pi ${{@:2} where ${@:2} is the one shortcut file to preview
+# 	-pi ${{@:2} where ${@:2} is the one shortcut file itself to preview
 #   or
-# 	-i ${{@:2} where ${@:2} is the one all shortcut file to open
+# 	-i ${{@:2} where ${@:2} is the one shortcut file itself to open
 #   or
 # 	$@ - all shortcut files to open
 #	since this takes input from _gt_get_files_starting_at_folder, which already checks if each file exists, this function doesn't check for file existence.
@@ -166,7 +166,7 @@ _gt_open_resources_from_files() {
 	fi
 
 	local gt_dir=GT_ROOTDIR
-	local current_shortcut_file current_shortcut_resources current_shortcut_keypath current_resource current_opening_method_code current_hyphenated_description current_resource_extension
+	local current_shortcut_file current_shortcut_keypath current_resource current_opening_method_code current_hyphenated_description current_resource_extension
 	local current_resource_no_http
 	local number_of_shortcut_fields=3
 	local number_of_pieces_of_info_per_shortcut=2
@@ -178,16 +178,11 @@ _gt_open_resources_from_files() {
 		current_shortcut_keypath="root/${current_shortcut_file#${gt_dir}/}"
 		current_shortcut_keypath="${current_shortcut_keypath%/$(basename $current_shortcut_keypath)}"
 		current_shortcut_keypath_display="${current_shortcut_keypath//\// -> }"
-		current_shortcut_resources=( $( cat "$current_shortcut_file" ) )
-		if [ "${#current_shortcut_resources}" -ne "$number_of_shortcut_fields" ]; then
-			printf >&2 "Incorrect resource information in shortcut file '$current_shortcut_file': expected $number_of_shortcut_fields fields but got ${#current_shortcut_resources} fields.\n"
-			return 4
-		fi
-		
-		current_resource="${current_shortcut_resources[1]}"
-		current_opening_method_code="${current_shortcut_resources[2]}"
+
+		current_resource="$( awk 'NR == 1 { print }' "$current_shortcut_file" )"
+		current_opening_method_code="$( awk 'NR == 2 { print }' "$current_shortcut_file" )"
 		current_self_opening_method="${current_opening_method_code%+*}"
-		current_hyphenated_description="${current_shortcut_resources[3]}"
+		current_hyphenated_description="$( awk 'NR == 3 { print }' "$current_shortcut_file" )"
 
 		current_resource_no_http="${current_resource#https://}"
 		current_resource_no_http="${current_resource_no_http#http://}"
@@ -242,11 +237,6 @@ _gt_open_resources_from_files() {
 					textedit_shortcut_descriptions+=( "$current_hyphenated_description" )
 					textedit_shortcut_keypaths+=( "$current_shortcut_keypath" )
 					;;
-				md)
-					bp_shortcut_resources+=( "$current_resource" )
-					bp_shortcut_descriptions+=( "$current_hyphenated_description" )
-					bp_shortcut_keypaths+=( "$current_shortcut_keypath" )
-					;;
 				*) 
 					open_shortcut_resources+=( "$current_resource" )
 					open_shortcut_descriptions+=( "$current_hyphenated_description" )
@@ -292,9 +282,9 @@ _gt_open_resources_from_files() {
 	fi
 	# check if there is exactly one directory to open for finder and none for cd. if so, move that dir to cd list.
 	if [ -z "$cd_shortcut_resources" ] && [ "$#finder_shortcut_resources" -eq 1 ]; then
-		cd_shortcut_resources=( ${finder_shortcut_resources[@]} )
-		cd_shortcut_descriptions=( ${finder_shortcut_descriptions[@]} )
-		cd_shortcut_keypaths=( ${finder_shortcut_keypaths[@]} )
+		cd_shortcut_resources=( "${finder_shortcut_resources[@]}" )
+		cd_shortcut_descriptions=( "${finder_shortcut_descriptions[@]}" )
+		cd_shortcut_keypaths=( "${finder_shortcut_keypaths[@]}" )
 		finder_shortcut_resources=()
 		finder_shortcut_descriptions=()
 		finder_shortcut_keypaths=()
@@ -318,7 +308,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open ${open_shortcut_resources[@]} || return $?
+			open "${open_shortcut_resources[@]}" || return $?
 		fi
 	fi
 	if [ "$#textedit_shortcut_resources" -gt 0 ]; then
@@ -336,7 +326,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -e ${textedit_shortcut_resources[@]} || return $?
+			open -e "${textedit_shortcut_resources[@]}" || return $?
 		fi
 	fi
 	if [ "$#bi_shortcut_resources" -gt 0 ]; then
@@ -354,7 +344,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Google Chrome' --args --incognito ${bi_shortcut_resources[@]} || return $?
+			open -na 'Google Chrome' --args --incognito "${bi_shortcut_resources[@]}" || return $?
 		fi
 	fi
 	if [ "$#bp_shortcut_resources" -gt 0 ]; then
@@ -372,7 +362,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			# open -na 'Google Chrome' --args --profile-directory="Profile 1" ${bp_shortcut_resources[@]} || return $?
+			# open -na 'Google Chrome' --args --profile-directory="Profile 1" "${bp_shortcut_resources[@]}" || return $?
 		fi
 	fi
 	if [ "$#bs_shortcut_resources" -gt 0 ]; then
@@ -390,7 +380,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			# open -na 'Google Chrome' --args --profile-directory="Default" ${bs_shortcut_resources[@]} || return $?
+			# open -na 'Google Chrome' --args --profile-directory="Default" "${bs_shortcut_resources[@]}" || return $?
 		fi
 	fi
 	if [ "$#finder_shortcut_resources" -gt 0 ]; then
@@ -408,7 +398,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open ${finder_shortcut_resources[@]}
+			open "${finder_shortcut_resources[@]}"
 		fi
 	fi
 	## then change directory
@@ -421,7 +411,7 @@ _gt_open_resources_from_files() {
 		fi
 		printf "cd to ${cd_shortcut_keypaths[1]//\// -> }${this_method_each_description_display}\n"
 		if [ "$preview_mode" = 'off' ]; then
-			cd ${cd_shortcut_resources[1]}
+			cd "${cd_shortcut_resources[1]}"
 		fi
 	fi
 	## then open all appropriate files using vim
@@ -440,7 +430,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			vim -p ${vim_shortcut_resources[@]}
+			vim -p "${vim_shortcut_resources[@]}"
 		fi
 	fi
 }
