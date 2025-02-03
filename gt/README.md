@@ -3,6 +3,8 @@
 ## purpose
 **gt** defines, maintains, and **g**oes **t**o shortcuts to resources, whether they be files on your computer or links to websites. 
 
+for more information on what **gt** does, install it and type `gt -h` and see the deets.
+
 ## "release" notes
 currently, **gt** does not support opening links using your own browser. you can ask me to set it up for you in 5 minutes or you can wait for a generalized update that sets it up for you.
 
