@@ -1,0 +1,4 @@
+#~/usr/bin/env bash
+cp ~/.qrc/functions/gt .
+cp ~/.qrc/scripts/_gt_helper .
+cp ~/.qrc/completions/_gt .

@@ -13,6 +13,8 @@ read -d '' GT_SYN_VAR << GT_SYNOPSIS
         [${bf}-s${nf} ${uf}keypath${nf}]
         [${bf}-t${nf} [${uf}keypath${nf}]]
         [${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]]
+        [${bf}-a${nf} ${uf}key${nf} ${uf}keypath${nf}]
+                [${bf}-u${nf} ${uf}keypath${nf}]
         [${bf}-n${nf} ${uf}key${nf} {${uf}resource${nf}|${bf}here${nf} [${uf}file${nf}]}
                 [${bf}-u${nf} ${uf}keypath${nf}]
                 [${bf}-d${nf} ${uf}description${nf}]
@@ -38,7 +40,7 @@ ${bf}DESCRIPTION${nf}
      Options include:
 
      [${bf}-p${nf}] [${bf}-i${nf}] ${uf}keypath${nf}
-             Open the resource uniquely specified by the ${uf}keypath${nf}. A ${uf}keypath${nf} consists of space-separated ${uf}keys${nf}, each of which functions as a user-defined shortcut to a resource, a parent for several children keys, or both. If the ${bf}-p${nf} option is given, then ${bf}gt${nf} shows a preview of the files to be opened but does not actually open them. If the ${bf}-i${nf} option is given, then ${bf}gt${nf} always opens the resource of the shortcut itself as long as it is defined and ignores any do-not-open or children-opening specifiers.
+             Open the resource specified by the ${uf}keypath${nf}. A ${uf}keypath${nf} consists of space-separated ${uf}keys${nf}, each of which functions as a user-defined shortcut to a resource, a parent for several children keys, or both. If the ${bf}-p${nf} option is given, then ${bf}gt${nf} shows a preview of the files to be opened but does not actually open them. If the ${bf}-i${nf} option is given, then ${bf}gt${nf} always opens the resource of the shortcut itself as long as it is defined and ignores any do-not-open or children-opening specifiers.
 
      ${bf}-s${nf} ${uf}keypath${nf}
              Show all information about ${uf}keypath${nf}.
@@ -47,7 +49,10 @@ ${bf}DESCRIPTION${nf}
              Display the full shortcuts hierarchy as a tree with the description, if any, of each shortcut. If ${uf}keypath${nf} is given, displays the shortcuts hierarchy starting at the matched shortcut.
 
      ${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]
-             Print help page. Optionally add ${bf}e${nf} to show exit codes. Optionally add ${bf}i${nf} to show internal API.
+             Print help page. Optionally add ${bf}e${nf} to show examples and exit codes. Optionally add ${bf}i${nf} to show internal API.
+
+     ${bf}-a${nf} ${uf}key${nf} ${uf}keypath${nf} [${bf}-u${nf} ${uf}keypath${nf}]
+             Create a new ${uf}key${nf} as an alias for an existing shortcut specified by the ${uf}keypath${nf}. Optionally specify the ${uf}keypath${nf} of an existing shortcut that will become the parent of the new alias.
 
      ${bf}-n${nf} ${uf}key${nf} [{${uf}resource${nf} | ${bf}here${nf} [${uf}file${nf}]}] [${bf}-u${nf} ${uf}keypath${nf}] [${bf}-d${nf} ${uf}description${nf}] [${bf}-o${nf} ${uf}method${nf}]
              Create a new ${uf}key${nf} for the specified ${uf}resource${nf}. A ${uf}resource${nf} can be one of the following categories and will be opened via a contextually appropriate method:
@@ -75,12 +80,18 @@ ${bf}DESCRIPTION${nf}
                      ${bf}file${nf} 
                              -        open file based on the extension:
                                               no-extension,.csv        vim
-                                              .txt,.rtf,.rtfd          TextEdit
+                                              .txt,.rtf,.rtfd,.wf      TextEdit
+                                              .md                      personal account on Brave Browser since it has markdown viewer
 
                      ${bf}directory${nf}
-                             ${uf}cd${nf}       cd to the directory
+                             ${uf}cd${nf}       cd to the directory and print a list of its files
 
                      ${bf}link${nf}
+                             ${uf}bi${nf}       open web link in incognito on Brave Browser
+                             bp       open web link in personal account on Brave Browser
+                             bs       open web link in school account on Brave Browser
+                             bw       open web link in (pm) work account on Brave Browser
+                             bl       open web link in (lc) work account on Brave Browser
 
              In addition to the above opening methods, ${bf}gt${nf} can recursively open first-layer children shortcuts if one of the following codes is appended to the opening method code for the shortcut itself. Children shortcuts that have an opening method of 'n' are still excluded. ${bf}gt${nf} will refuse to open any child shortcut if there are more than one directory shortcuts, since \`cd' cannot go to two places at once.
                              +ca      recursively open all children shortcuts by their respective opening methods, excluding any shortcut that has an opening method of 'n'
@@ -109,6 +120,24 @@ ${bf}DESCRIPTION${nf}
 GT_MANUAL
 
 read -d '' GT_ES_VAR << GT_EXIT_STATUS
+${bf}EXAMPLES${nf}
+     -   After navigating to the folder containing your work files, this command creates a new shortcut to this folder, naming the shortcut 'work' and giving it the description 'my work folder'.
+
+               $ gt -n work here -d my work folder
+
+     -   After navigating to the folder containing file.txt, this command adds creates a shortcut to this file.txt, naming the shortcut 'current', attaching it under a previously created shortcut named 'work'. Note that file.txt does not have to be hierarchically under the work folder in the filesystem. The 'current' shortcut is only under the 'work' shortcut within the ${bf}gt${nf} shortcut tree.
+
+               $ gt -n current here file.txt -u work
+
+
+     -   See the portion of the shortcut tree that is under the 'work' shortcut. Remember that ${bf}gt${nf} allows for TAB autocompletion, so if you only have one shortcut starting with 'w', you can type 'w' then TAB to get 'work'.
+
+               $ gt -t work
+
+     -   After navigating to the folder containing file2.txt, this command renames the 'current' shortcut to 'latest' and simultaneously updates the file it points to to 'file2.txt'. This involves editing the key and the resource of the shortcut, so we use the -e option with the -k and -r suboptions.
+
+               $ gt -e current -k latest -r here file2.txt
+
 ${bf}EXIT STATUS${nf}
      The ${bf}gt${nf} utility exits with one of the following values:
 
@@ -125,6 +154,8 @@ ${bf}EXIT STATUS${nf}
      7     A shortcut already exists at the specified location.
      8     Cannot cd to multiple directories.
      9     Cannot move a shortcut under itself or its child.
+     10    Shortcut has an empty resource so cannot be opened.
+     11    Cannot create symlink.
 GT_EXIT_STATUS
 
 helper_script_name="$( basename ${ZSH_ARGZERO} )"
@@ -199,7 +230,8 @@ get_shortcut_at_keypath() {
 	for key in "${keypath[@]}"; do
 		#report_variable key
 		#report_variable under_dir
-		found_resource_dirs=( $( find "${under_dir}" -type d -name "${key}") )
+		# note -type l is included to allow finding symlinks. order of precedence dictates the correct operand grouping
+		found_resource_dirs=( $( find "${under_dir}" -type d -name "${key}" -or -type l -name "${key}" ) )
 		if [ -z "${found_resource_dirs}" ]; then
 			if [ "$mode" = "directory" ]; then printf >&2 "The keypath '${keypath}' did not match any shortcut.\n"; fi
 			return 1
@@ -231,12 +263,20 @@ get_shortcut_at_keypath() {
 	else
 		shortcut_dir="$under_dir"
 	fi
+
+	# strip trailing slash. if symlink, convert to linked folder path so that caller can build the correct key.gt file.
+	shortcut_dir_filetype="$( stat "${shortcut_dir%/}" | cut -d ' ' -f3 )"
+	if [[ "$shortcut_dir_filetype" =~ ^l ]]; then
+		shortcut_dir="$( readlink -nf %N ${shortcut_dir%/} )"
+	fi
+	
+
 	if [ "$mode" = "directory" ]; then
 		printf "${shortcut_dir%/}"
 		return 100
 	elif [ "$mode" = "subkeys" ]; then
 		local subkeys
-		subkeys=( $( cd "$shortcut_dir" && find * -maxdepth 0 -type d ) )
+		subkeys=( $( cd "$shortcut_dir" && find * -maxdepth 0 -type d -or maxdepth 0 -type l ) )
 		echo "${subkeys[@]}"
 		return 200
 	fi
@@ -337,6 +377,8 @@ while ! [ -z "$1" ]; do
 					*)
 						printf >&2 "Unknown ${bf}-n${nf} optional option '$1'\n"
 						exit 255
+						;;
+
 				esac
 				options_passed+=( "$current_option" )
 			done
@@ -344,15 +386,14 @@ while ! [ -z "$1" ]; do
 			shortcut_dir="${parent_dir}/${key}"
 			if [ -d "$shortcut_dir" ]; then
 				trimmed_shortcut_dir="${shortcut_dir#${gt_dir}/}"
-				printf >&2 "\t${trimmed_found_path//\// }\n"
-				printf >&2 "A shortcut at the specified keypath '${trimmed_shortcut_dir//\// }' already exists, so shortcut creation is cancelled.\n"
+				printf >&2 "A shortcut at the specified keypath '${trimmed_shortcut_dir//\// -> }' already exists, so shortcut creation is cancelled.\n"
 				exit 7
 			fi
 			mkdir "$shortcut_dir"
 			shortcut_file_absolute_path="${shortcut_dir}/${key}.gt"
 			printf "$resource\n" > "$shortcut_file_absolute_path" # required resource field
 			printf "${opening_method_code}\n" >> "$shortcut_file_absolute_path" # opening method code
-			printf "${description// /-}\n" >> "$shortcut_file_absolute_path" # description (hyphenated for storage)
+			printf "${description}\n" >> "$shortcut_file_absolute_path" # description (hyphenated for storage)
 
 			shortcut_output=''
 			if [ "$resource" = '-' ]; then
@@ -376,7 +417,7 @@ while ! [ -z "$1" ]; do
 				keypath_output="${truncated_parent_dir//\// -> }"
 			fi
 			keypath_output+=" -> $key"
-			printf >&2 "added ${shortcut_output} with key '$key' ${description_output}${opening_method_output}at $keypath_output\n"
+			printf >&2 "added ${shortcut_output} ${description_output}${opening_method_output}at $keypath_output\n"
 			exit 0
 			;;
 
@@ -532,8 +573,8 @@ while ! [ -z "$1" ]; do
 					*)
 						printf >&2 "Unknown ${bf}-e${nf} optional option '$1'\n"
 						exit 255
+						;;
 	
-					
 				esac
 				options_passed+=( "$current_option" )
 			done
@@ -600,7 +641,7 @@ while ! [ -z "$1" ]; do
 			fi
 			if [ "$new_description" != "$prev_description" ]; then
 				sed_string='3s|^.*$|'
-				sed_string+="${new_description// /-}|"
+				sed_string+="${new_description}|"
 				sed -i '' "$sed_string" "$new_ste_file"
 				if [ "$prev_description" = ' ' ]; then
 					prev_display="$empty_field"
@@ -612,12 +653,12 @@ while ! [ -z "$1" ]; do
 				else
 					new_display="'$new_description'"
 				fi
-				printf >&2 "Updated description from \n  $prev_display to \n  $new_display \nfor shortcut at \n  '$new_keypath_display'\n"
+				printf >&2 "Updated description from \n  $prev_display to \n  $new_display for shortcut at \n  '$new_keypath_display'\n"
 			fi
 			exit 0
 			;;
 
-		-s) # called by `gt -s keypath`
+		-s) # called by `gt -s keypath` as `_gt_helper -s keypath`
 			if [ "$#" -lt 2 ]; then
 				printf >&2 "Missing ${uf}keypath${nf} to show.\n"
 				exit 254
@@ -643,7 +684,7 @@ while ! [ -z "$1" ]; do
 			printf >&2 "Information for ${shortcut_keypath_display}:\n"
 			printf >&2 '  resource:     %s\n' "${shortcut_resource}"
 			printf >&2 '  opening code: %s\n' "${shortcut_opening_code}"
-			printf >&2 '  description:  %s\n' "${shortcut_description//-/ }"
+			printf >&2 '  description:  %s\n' "${shortcut_description}"
 			exit 0
 			;;
 
@@ -689,17 +730,17 @@ while ! [ -z "$1" ]; do
 					fi
 
 					# formatted print algorithm begins
-					local hyphen_desc="$( awk 'NR == 3 {print}' "$child/${child##*/}.gt" )"
-					local unhyphen_desc="${hyphen_desc//-/ }"
+					local desc_itself="$( awk 'NR == 3 {print}' "$child/${child##*/}.gt" )"
+					if [ "$desc_itself" = '-' ]; then desc_itself=''; fi
 					local pre_spacer_str="${prefix}${pointer}${child##*/}"
 					local pre_spacer_len=${#pre_spacer_str}
 
 					local full_line
 					# at this point the full_line should not have newline chars at the end
 					if [ $(( $pre_spacer_len + 1 )) -gt $desc_start_col ]; then
-						full_line="$pre_spacer_str ${hyphen_desc//-/ }"
+						full_line="$pre_spacer_str ${desc_itself}"
 					else
-						full_line="$pre_spacer_str$( printf "%$(( $desc_start_col - $pre_spacer_len ))s" )${unhyphen_desc}"
+						full_line="$pre_spacer_str$( printf "%$(( $desc_start_col - $pre_spacer_len ))s" )${desc_itself}"
 					fi
 
 					# print out the description in a proper fashion
@@ -709,14 +750,14 @@ while ! [ -z "$1" ]; do
 
 					this_line_first_char=$(( $full_width ))
 					if [ "${this_line_len}" -lt "${full_line_len}" ]; then 
-						printf >&2 "${full_line%${unhyphen_desc}}${bf}${this_line:${desc_start_col}}${nf}\n"
+						printf >&2 "${full_line%${desc_itself}}${bf}${this_line:${desc_start_col}}${nf}\n"
 						while [ $this_line_first_char -lt "${full_line_len}" ]; do 
 							printf >&2 "%${desc_start_col}s"
 							printf >&2 "${bf}${full_line:${this_line_first_char}:${desc_rest_col}}${nf}\n"
 							(( this_line_first_char += desc_rest_col ))
 						done
 					else
-						printf >&2 "${this_line%${unhyphen_desc}}${bf}${unhyphen_desc}${nf}\n"
+						printf >&2 "${this_line%${desc_itself}}${bf}${desc_itself}${nf}\n"
 					fi
 					# formatted print algorithm ends
 
@@ -731,31 +772,127 @@ while ! [ -z "$1" ]; do
 				# below alg is identical to the formatted printing alg from gt_traverse() above except marked lines
 				pre_spacer_str="${traversal_root##*/}" # diff vs. gt_traverse
 				pre_spacer_len="${#pre_spacer_str}"
-				hyphen_desc="$( awk 'NR == 3 {print}' "${traversal_root}/${pre_spacer_str}.gt" )" # diff vs. gt_traverse
-				unhyphen_desc="${hyphen_desc//-/ }"
+				desc_itself="$( awk 'NR == 3 {print}' "${traversal_root}/${pre_spacer_str}.gt" )" # diff vs. gt_traverse
+				if [ "$desc_itself" = '-' ]; then desc_itself=''; fi
 				if [ $(( $pre_spacer_len + 1 )) -gt $desc_start_col ]; then
-					full_line="$pre_spacer_str ${hyphen_desc//-/ }"
+					full_line="$pre_spacer_str ${desc_itself}"
 				else
-					full_line="$pre_spacer_str$( printf "%$(( $desc_start_col - $pre_spacer_len ))s" )${unhyphen_desc}"
+					full_line="$pre_spacer_str$( printf "%$(( $desc_start_col - $pre_spacer_len ))s" )${desc_itself}"
 				fi
 				this_line="${full_line:0:${full_width}}"
 				this_line_len=${#this_line}
 				full_line_len=${#full_line}
 				this_line_first_char=$(( $full_width ))
 				if [ "${this_line_len}" -lt "${full_line_len}" ]; then 
-					printf >&2 "${full_line%${unhyphen_desc}}${bf}${this_line:${desc_start_col}}${nf}\n"
+					printf >&2 "${full_line%${desc_itself}}${bf}${this_line:${desc_start_col}}${nf}\n"
 					while [ $this_line_first_char -lt "${full_line_len}" ]; do 
 						printf >&2 "%${desc_start_col}s"
 						printf >&2 "${bf}${full_line:${this_line_first_char}:${desc_rest_col}}${nf}\n"
 						(( this_line_first_char += desc_rest_col ))
 					done
 				else
-					printf >&2 "${this_line%${unhyphen_desc}}${bf}${unhyphen_desc}${nf}\n"
+					printf >&2 "${this_line%${desc_itself}}${bf}${desc_itself}${nf}\n"
 				fi
 			fi
 
 			gt_traverse $traversal_root ""
 			unsetopt CSH_NULL_GLOB
+			exit 0
+			;;
+
+		-a) # called by `gt -a ...` as `_gt_helper -a ...`
+			if [ -z "$2" ]; then printf >&2 "Missing key for alias.\n"; exit 254; else shift; fi
+			key="$1"
+			#report_variable key
+
+			# es = existing shortcut
+			es_args=()
+			while ! [ -z "$2" ] && ! [[ "$2" =~ ^- ]]; do
+				shift
+				es_args+=("$1")
+			done
+			if [ -z "$es_args" ]; then
+				printf >&2 "Missing keypath for existing shortcut to alias to.\n"
+				exit 254
+			fi
+			# report_variable es_args
+
+			es_dir="$( get_shortcut_at_keypath directory ${es_args[@]} )"
+			exit_code="$?"
+			if [ "$exit_code" -ne 100 ]; then
+				exit "$exit_code"
+			fi
+			#report_variable es_dir
+
+			parent_dir="${gt_dir}"
+			options_passed=()
+
+			while ! [ -z "$2" ]; do
+				shift
+				current_option="$1"
+				if [[ "${options_passed[*]}" =~ $current_option ]]; then
+					printf >&2 "The option ${bf}$current_option${nf} should not be passed multiple times.\n"
+					exit 255
+				fi
+				case "$1" in
+					-u)
+						u_args=()
+						# while next arg exists and isn't an opt, keep adding it to u_args array
+						while ! [ -z "$2" ] && ! [[ "$2" =~ ^- ]]; do
+							shift
+							u_args+=("$1")
+						done
+						if [ -z "$u_args" ]; then
+							printf >&2 "Missing parent keypath for ${bf}-u${nf}.\n"
+							exit 254
+						fi
+						parent_dir="$( get_shortcut_at_keypath directory ${u_args[@]} )"
+						exit_code="$?"
+						if [ "$exit_code" -ne 100 ]; then
+							exit "$exit_code"
+						fi
+						#report_variable parent_dir
+						;;
+					*)
+						printf >&2 "Unknown ${bf}-a${nf} optional option '$1'\n"
+						exit 255
+						;;
+
+				esac
+				options_passed+=( "$current_option" )
+			done
+			
+			alias_path="${parent_dir}/${key}"
+			#report_variable alias_path
+
+			if [ -d "$alias_path" ]; then
+				trimmed_alias_path="${alias_path#${gt_dir}/}"
+				printf >&2 "A shortcut at the specified keypath '${trimmed_alias_path//\// -> }' already exists, so shortcut creation is cancelled.\n"
+				exit 7
+			elif [ -L "$alias_path" ]; then
+				trimmed_alias_path="${alias_path#${gt_dir}/}"
+				printf >&2 "An alias at the specified keypath '${trimmed_alias_path//\// -> }' already exists, so shortcut creation is cancelled.\n"
+				exit 7
+			fi
+
+			# create alias as symlink
+			ln -s "$es_dir" "$alias_path" || { printf >&2 "failed to create symlink from '$alias_path' to '$es_dir'" ; exit 11 ; }
+
+			# format keypath outputs
+			alias_keypath_output=''
+			if [ "$parent_dir" = "$gt_dir" ]; then
+				alias_keypath_output="root"
+			else
+				truncated_parent_dir="${parent_dir#${gt_dir}/}"
+				alias_keypath_output="${truncated_parent_dir//\// -> }"
+			fi
+			alias_keypath_output+=" -> $key"
+
+			es_keypath_output=''
+			truncated_es_dir="${es_dir#${gt_dir}/}"
+			es_keypath_output="${truncated_es_dir//\// -> }"
+
+			printf >&2 "added new alias to $es_keypath_output at $alias_keypath_output\n"
 			exit 0
 			;;
 
