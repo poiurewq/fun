@@ -264,16 +264,18 @@ if ! [ -f $clock_log ]; then
 fi
 ## Ensure that the clock log always ends with the last non-empty line ##
 clock_log_tmp=${clock_log}.tmp
-while
-	last_line=$(tail -1 "$clock_log") &&
-	[ -z "$last_line" ] || 
-	printf "$last_line" | grep -Eq '^ *$' ||
-	printf "$last_line" | grep -Eq '^	$'
-do
-	printf "Removing trailing blank line in clock log\n"
-	sed -e '$d' "$clock_log" > $clock_log_tmp || exit 2
-	cp $clock_log_tmp $clock_log || exit 2
-done
+if [ -s "$clock_log" ]; then
+	while
+		last_line=$(tail -1 "$clock_log") &&
+		[ -z "$last_line" ] || 
+		printf "$last_line" | grep -Eq '^ *$' ||
+		printf "$last_line" | grep -Eq '^	$'
+	do
+		printf "Removing trailing blank line in clock log\n"
+		sed -e '$d' "$clock_log" > $clock_log_tmp || exit 2
+		mv $clock_log_tmp $clock_log || exit 2
+	done
+fi
 # At this point the last_line variable should hold the last line content.
 
 #### Perform pre-'in' OR pre-'add' log validity check ####
@@ -293,7 +295,7 @@ if [ "$clock_subfunction" = 'in' ] || [ "$clock_subfunction" = 'add' ]; then
 
 			if [ "$user_input_session_mins" = 'r' ]; then
 				sed -e '$d' $clock_log > $clock_log_tmp || exit 2
-				cp $clock_log_tmp $clock_log || exit 2
+				mv $clock_log_tmp $clock_log || exit 2
 				printf "\nRemoved partial record\n"
 				printf "  ${last_line}\n"
 				repeat_prompt='false'
@@ -316,7 +318,7 @@ if [ "$clock_subfunction" = 'in' ] || [ "$clock_subfunction" = 'add' ]; then
 				replaced_record="${end_timestamp},${start_tag},${user_input_session_mins}"
 				sed -e '$d' $clock_log > $clock_log_tmp || exit 2
 				printf "${replaced_record}\n" >> $clock_log_tmp || exit 2
-				cp $clock_log_tmp $clock_log || exit 2
+				mv $clock_log_tmp $clock_log || exit 2
 
 				printf "\nReplaced partial session with a full session in\n  ${start_tag}\n  that lasted for\n  ${user_input_session_mins} minutes\n  and ended at\n  ${end_timestamp}.\n"
 
@@ -424,7 +426,7 @@ if [ "$clock_subfunction" = 'out' ]; then
 	replaced_record="${adjusted_end_timestamp},${clock_tag},${session_length}"
 	sed -e '$d' $clock_log > $clock_log_tmp || exit 2
 	printf "${replaced_record}\n" >> $clock_log_tmp || exit 2
-	cp $clock_log_tmp $clock_log || exit 2
+	mv $clock_log_tmp $clock_log || exit 2
 
 	printf "\nRecorded full session in\n  ${clock_tag}\n  that lasted for\n  ${session_length} minutes\n  and ended at\n  ${adjusted_end_timestamp}.\n"
 
@@ -474,7 +476,7 @@ if [ "$clock_subfunction" = 'remove' ]; then
 
 	## Remove last log item & print it ##
 	sed -e '$d' $clock_log > $clock_log_tmp || exit 2
-	cp $clock_log_tmp $clock_log || exit 2
+	mv $clock_log_tmp $clock_log || exit 2
 	printf "\nRemoved record\n"
 	printf "  ${last_line}\n"
 
@@ -511,7 +513,7 @@ if [ "$clock_subfunction" = 'past' ]; then
 
 	# sort the records
 	sort $clock_log > $clock_log_tmp || exit 2
-	cp $clock_log_tmp $clock_log || exit 2
+	mv $clock_log_tmp $clock_log || exit 2
 
 	# search backwards using tail and find earliest in-cutoff timestamp
 	first_timestamp_of_all_time="$( head -1 $clock_log | cut -d, -f1 )"
