@@ -15,11 +15,12 @@ clock_user_facing_fmt='yyyy.mm.dd-HH:MM'
 
 clock_synopsis_line1='clock'
 clock_synopsis_line2='help [ error ]'
-clock_synopsis_line3='in | out { to | for | from } <tag> [ minus <minutes> ]'
-clock_synopsis_line4='add { session | sesh } { to | for } <tag> for <minutes> [ { ended | ending } { minus <minutes> } | { at <timestamp> } ]'
-clock_synopsis_line5='remove'
+clock_synopsis_line3='in | out <tag> [ { minus <minutes> } | { at <timestamp> } ]'
+clock_synopsis_line4='add <tag> for <minutes> [ { ended | ending } { { minus <minutes> } | { at <timestamp> } } ]'
+clock_synopsis_line5='remove | pop'
 clock_synopsis_line6='log'
-clock_synopsis_line7='past <number> day[s]'
+clock_synopsis_line7='last'
+clock_synopsis_line8='past { day | week } | { <number> { days | weeks } }'
 
 read -d '' CLOCK_SYN_VAR << CLOCK_SYN_DOC
 ${clock_synopsis_line1}   [ ${clock_synopsis_line2} ]
@@ -28,6 +29,7 @@ ${clock_synopsis_line1}   [ ${clock_synopsis_line2} ]
         [ ${clock_synopsis_line5} ]
         [ ${clock_synopsis_line6} ]
         [ ${clock_synopsis_line7} ]
+        [ ${clock_synopsis_line8} ]
 CLOCK_SYN_DOC
 
 CLOCK_HEADER='end time,tag,length'
@@ -43,6 +45,7 @@ SYNOPSIS
              [ ${clock_synopsis_line5} ]
              [ ${clock_synopsis_line6} ]
              [ ${clock_synopsis_line7} ]
+             [ ${clock_synopsis_line8} ]
 
 DESCRIPTION
    
@@ -60,13 +63,16 @@ DESCRIPTION
              Manually add a session of <minutes> length to the log, ending at the time of command call. Optionally specify either the number of <minutes> ago or the <timestamp> at which the session ended. The <timestamp> should be in the format '${clock_user_facing_fmt}'.
    
      ${clock_synopsis_line5}
-             Remove the last session record, whether incomplete or complete, and see what was removed.
+             Remove the last session record, whether incomplete or complete, and see what was removed. A synonym for 'remove' is 'pop'.
    
      ${clock_synopsis_line6}
              Open the clock log file itself. It is helpful for manually editing session details. The clock log records work sessions as rows. Its implicit header is '${CLOCK_HEADER}'.
-   
+
      ${clock_synopsis_line7}
-             Prints a useful summary of clock records over the past <number> of days, grouping the results by tag.
+             Prints the last entry of the clock log.
+   
+     ${clock_synopsis_line8}
+             Prints a useful summary of clock records over the past <number> of day(s) or week(s), grouping the results by tag. If no <number> is given, the number is assumed to be 1.
 CLOCK_MAN_DOC
    
 read -d '' CLOCK_ERROR_VAR << CLOCK_ERROR_DOC
@@ -108,9 +114,11 @@ fi
 clock_subfunction="" # in, out, add, undo, log, review
 clock_tag="" # any one-word alphanumeric
 clock_minus_minutes="" # any positive integer
+clock_in_out_timestamp="" # in clock_fmt
 clock_for_minutes="" # any positive integer
 clock_add_end_timestamp="" # in clock_fmt
-clock_past_number="" # any positive integer
+clock_past_days="" # any positive integer
+clock_past_unit="" # day, week
 
 if [ -z "$1" ]; then printf "Missing option for clock\n" >&2 && exit 1; fi
 
@@ -118,24 +126,74 @@ case "$1" in
 in|out)
 	clock_subfunction="$1"
 
-	if [ -z "$2" ]; then printf "Missing { to | for | from } keyword after 'clock $1'\n" >&2 && exit 1; fi
+	if [ -z "$2" ]; then printf "Missing <tag> in 'clock $1 $2 <tag>'\n" >&2 && exit 1; fi
 
-	case "$2" in
+	clock_tag="$2"
 
-	to|for|from)
-		if [ -z "$3" ]; then printf "Missing <tag> in 'clock $1 $2 <tag>'\n" >&2 && exit 1; fi
-		clock_tag="$3"
+	if ! [ -z "$3" ]; then
+		case "$3" in
+		minus)
+			if [ -z "$4" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 <minutes>'\n" >&2 && exit 1; fi
+			if ! [ -z "$4" ] && ! printf '%s' "$4" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 <minutes>'\n" >&2 && exit 1; fi
+			clock_minus_minutes="$4"
+			;;
 
-		if ! [ -z "$4" ]; then
-			case "$4" in
-			minus)
-				if [ -z "$5" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 <minutes>'\n" >&2 && exit 1; fi
-				if ! [ -z "$5" ] && ! printf "$5" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 <minutes>'\n" >&2 && exit 1; fi
-				clock_minus_minutes="$5"
+		at)
+			if [ -z "$4" ]; then printf "Missing <timestamp> in 'clock $1 $2 $3 <timestamp>'\n" >&2 && exit 1; fi
+			if ! [ -z "$4" ] && ! printf '%s' "$4" | grep -Eq '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}:[0-9]{2}$'; then printf "Please provide a valid timestamp in the format '${clock_user_facing_fmt}' for <timestamp> in 'clock $1 $2 $3 <timestamp>'\n" >&2 && exit 1; fi
+			clock_in_out_timestamp="$5"
+			;;
+
+		
+		*) 	printf "Unknown suboption '$3' after 'clock $1 $2'\n" >&2 && exit 1
+			;;
+		esac
+	fi
+
+	;;
+
+add)
+	clock_subfunction="$1"
+	
+	if [ -z "$2" ]; then printf "Missing <tag> in 'clock $1 <tag> for <minutes>'\n" >&2 && exit 1; fi
+
+	clock_tag="$2"
+
+	if [ -z "$3" ]; then printf "Missing 'for' keyword in 'clock $1 $2 for <minutes>'\n" >&2 && exit 1; fi
+
+	case "$3" in
+	for)
+		if [ -z "$4" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 <minutes>'\n" >&2 && exit 1; fi
+		if ! [ -z "$4" ] && ! printf '%s' "$4" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 <minutes>'\n" >&2 && exit 1; fi
+		clock_for_minutes="$4"
+
+		if ! [ -z "$5" ]; then
+			case "$5" in
+			ended|ending)
+				if [ -z "$6" ]; then printf "Missing 'minus' or 'at' keyword after 'clock $1 $2 $3 $4 $5'\n" >&2 && exit 1; fi
+
+				case "$6" in
+				minus)
+					if [ -z "$7" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 $5 $6 <minutes>'\n" >&2 && exit 1; fi
+					if ! [ -z "$7" ] && ! printf '%s' "$7" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 $5 $6 <minutes>'\n" >&2 && exit 1; fi
+					clock_minus_minutes="$7"
+
+					;;
+
+				at)
+					if [ -z "$7" ]; then printf "Missing <timestamp> in 'clock $1 $2 $3 $4 $5 $6 <timestamp>'\n" >&2 && exit 1; fi
+					if ! [ -z "$7" ] && ! printf '%s' "$7" | grep -Eq '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}:[0-9]{2}$'; then printf "Please provide a valid timestamp in the format '${clock_user_facing_fmt}' for <timestamp> in 'clock $1 $2 $3 $4 $5 $6 <timestamp>'\n" >&2 && exit 1; fi
+					clock_add_end_timestamp="$7"
+
+					;;
+
+				*) 	printf "Unknown suboption '$6' after 'clock $1 $2 $3 $4 $5'\n" >&2 && exit 1
+					;;
+				esac
 
 				;;
 			
-			*) 	printf "Unknown suboption '$4' after 'clock $1 $2 $3'\n" >&2 && exit 1
+			*) 	printf "Unknown suboption '$5' after 'clock $1 $2 $3 $4'\n" >&2 && exit 1
 				;;
 			esac
 		fi
@@ -148,81 +206,7 @@ in|out)
 
 	;;
 
-add)
-	clock_subfunction="$1"
-	
-	if [ -z "$2" ]; then printf "Missing 'session' or 'sesh' keyword after 'clock $1'\n" >&2 && exit 1; fi
-
-	case "$2" in
-	session|sesh)
-
-		if [ -z "$3" ]; then printf "Missing { in | to | for } keyword after 'clock $1 $2'\n" >&2 && exit 1; fi
-
-		case "$3" in
-		in|to|for)
-			if [ -z "$4" ]; then printf "Missing <tag> in 'clock $1 $2 $3 <tag> for <minutes>'\n" >&2 && exit 1; fi
-			clock_tag="$4"
-
-			if [ -z "$5" ]; then printf "Missing 'for' keyword in 'clock $1 $2 $3 $4 for <minutes>'\n" >&2 && exit 1; fi
-
-			case "$5" in
-			for)
-				if [ -z "$6" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 $5 <minutes>'\n" >&2 && exit 1; fi
-				if ! [ -z "$6" ] && ! printf "$6" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 $5 <minutes>'\n" >&2 && exit 1; fi
-				clock_for_minutes="$6"
-
-				if ! [ -z "$7" ]; then
-					case "$7" in
-					ended|ending)
-						if [ -z "$8" ]; then printf "Missing 'minus' or 'at' keyword after 'clock $1 $2 $3 $4 $5 $6 $7'\n" >&2 && exit 1; fi
-
-						case "$8" in
-						minus)
-							if [ -z "$9" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 $5 $6 $7 $8 <minutes>'\n" >&2 && exit 1; fi
-							if ! [ -z "$9" ] && ! printf "$9" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 $5 $6 $7 $8 <minutes>'\n" >&2 && exit 1; fi
-							clock_minus_minutes="$9"
-
-							;;
-
-						at)
-							if [ -z "$9" ]; then printf "Missing <timestamp> in 'clock $1 $2 $3 $4 $5 $6 $7 $8 <timestamp>'\n" >&2 && exit 1; fi
-							if ! [ -z "$9" ] && ! printf "$9" | grep -Eq '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}:[0-9]{2}$'; then printf "Please provide a valid timestamp in the format '${clock_user_facing_fmt}' for <timestamp> in 'clock $1 $2 $3 $4 $5 $6 $7 $8 <timestamp>'\n" >&2 && exit 1; fi
-							clock_add_end_timestamp="$9"
-
-							;;
-
-						*) 	printf "Unknown suboption '$8' after 'clock $1 $2 $3 $4 $5 $6 $7'\n" >&2 && exit 1
-							;;
-						esac
-
-						;;
-					
-					*) 	printf "Unknown suboption '$7' after 'clock $1 $2 $3 $4 $5 $6'\n" >&2 && exit 1
-						;;
-					esac
-				fi
-
-				;;
-
-			*) printf "Unknown suboption '$5' after 'clock $1 $2 $3 $4'\n" >&2 && exit 1
-				;;
-			esac
-
-			;;
-
-		*) 	printf "Unknown suboption '$3' after 'clock $1 $2'\n" >&2 && exit 1
-			;;
-		esac
-
-		;;
-
-	*) 	printf "Unknown suboption '$2' after 'clock $1'\n" >&2 && exit 1
-		;;
-	esac
-
-	;;
-
-remove|log)
+remove|pop|log|last)
 	clock_subfunction="$1"
 
 	;;
@@ -230,20 +214,35 @@ remove|log)
 past)
 	clock_subfunction="$1"
 
-	if [ -z "$2" ]; then printf "Missing <number> in 'clock $1 <number> day[s]'\n" >&2 && exit 1; fi
-	clock_past_number="$2"
+	if [ -z "$2" ]; then printf "Missing second word in '${clock_synopsis_line7}'\n" >&2 && exit 1; fi
 
-	if [ -z "$3" ]; then printf "Missing 'day' or 'days' keyword after 'clock $1 $2'\n" >&2 && exit 1; fi
-
-	case "$3" in
-	day|days) 
-		:
+	case "$2" in
+	day)
+		clock_past_days=1
 		;;
+	week)
+		clock_past_days=7
+		;;
+	*)
+		if printf '%s' "$2" | grep -Eq '^[0-9]+$'; then
 
-	*) printf "Unknown suboption '$3' after 'clock $1 $2'\n" >&2 && exit 1
+			if [ -z "$3" ]; then printf "Missing 'day' or 'days' keyword after 'clock $1 $2'\n" >&2 && exit 1; fi
+
+			case "$3" in
+			days) 
+				clock_past_days="$2"
+				;;
+			weeks)
+				clock_past_days="$(( $2 * 7 ))"
+				;;
+			*) printf "Unknown suboption '$3' after 'clock $1 $2'\n" >&2 && exit 1
+				;;
+			esac
+		else
+			printf "Unknown suboption '$2' after 'clock $1'\n" >&2 && exit 1
+		fi
 		;;
 	esac
-
 	;;
 
 
@@ -268,8 +267,8 @@ if [ -s "$clock_log" ]; then
 	while
 		last_line=$(tail -1 "$clock_log") &&
 		[ -z "$last_line" ] || 
-		printf "$last_line" | grep -Eq '^ *$' ||
-		printf "$last_line" | grep -Eq '^	$'
+		printf '%s' "$last_line" | grep -Eq '^ *$' ||
+		printf '%s' "$last_line" | grep -Eq '^	$'
 	do
 		printf "Removing trailing blank line in clock log\n"
 		sed -e '$d' "$clock_log" > $clock_log_tmp || exit 2
@@ -300,7 +299,7 @@ if [ "$clock_subfunction" = 'in' ] || [ "$clock_subfunction" = 'add' ]; then
 				printf "  ${last_line}\n"
 				repeat_prompt='false'
 
-			elif printf "$user_input_session_mins" | grep -Eq '^[0-9]+$'; then
+			elif printf '%s' "$user_input_session_mins" | grep -Eq '^[0-9]+$'; then
 				# Calculate end timestamp based on start timestamp and user-provided session length
 				end_timestamp=""
 				case "$current_os" in
@@ -308,7 +307,7 @@ if [ "$clock_subfunction" = 'in' ] || [ "$clock_subfunction" = 'add' ]; then
 						# timestamp format in clock_fmt
 						start_epochtime="$( date -d "$start_timestamp" +'%s' )" || exit 4
 						end_epochtime="$(( $start_epochtime + $user_input_session_mins * 60 ))"
-						end_timestamp="$( date -d "$end_epochtime" +$clock_fmt )" || exit 4
+						end_timestamp="$( date -d @"$end_epochtime" +$clock_fmt )" || exit 4
 						;;
 					Darwin)
 						end_timestamp="$( date -j -v+${user_input_session_mins}M -f $clock_fmt "$start_timestamp" +$clock_fmt )" || exit 4
@@ -341,24 +340,28 @@ fi
 if [ "$clock_subfunction" = 'in' ]; then
 	## Add 'in' portion of session to log ##
 	# if needed, calculate adjusted timestamp for start time
-	adjusted_start_timestamp=""
-	if ! [ -z "$clock_minus_minutes" ]; then
-		case "$current_os" in
-			Linux)
-				current_epochtime="$(date +'%s')"
-				adjusted_epochtime=$(( $current_epochtime - $clock_minus_minutes * 60 ))
-				adjusted_start_timestamp="$( date -d $adjusted_epochtime +$clock_fmt )"
-				;;
-			Darwin)
-				adjusted_start_timestamp="$(date -v -${clock_minus_minutes}M +$clock_fmt)"
-				;;
-		esac
+	start_timestamp=""
+	if ! [ -z "$clock_in_out_timestamp" ]; then
+		start_timestamp="$clock_in_out_timestamp"
 	else
-		adjusted_start_timestamp="$(date +$clock_fmt)"
+		if ! [ -z "$clock_minus_minutes" ]; then
+			case "$current_os" in
+				Linux)
+					current_epochtime="$(date +'%s')"
+					adjusted_epochtime=$(( $current_epochtime - $clock_minus_minutes * 60 ))
+					start_timestamp="$( date -d @$adjusted_epochtime +$clock_fmt )"
+					;;
+				Darwin)
+					start_timestamp="$(date -v -${clock_minus_minutes}M +$clock_fmt)"
+					;;
+			esac
+		else
+			start_timestamp="$(date +$clock_fmt)"
+		fi
 	fi
 
-	printf "started,${adjusted_start_timestamp},${clock_tag}\n" >> $clock_log &&
-		printf "\nAdded new session in\n  ${clock_tag}\n  that started at\n  ${adjusted_start_timestamp}\n" ||
+	printf "started,${start_timestamp},${clock_tag}\n" >> $clock_log &&
+		printf "\nAdded new session in\n  ${clock_tag}\n  that started at\n  ${start_timestamp}\n" ||
 		exit 2
 	
 	printf '\n'
@@ -382,20 +385,24 @@ if [ "$clock_subfunction" = 'out' ]; then
 
 	## Add 'out' portion of session to log ##
 	# if needed, calculate adjusted timestamp for end time
-	adjusted_end_timestamp=""
-	if ! [ -z "$clock_minus_minutes" ]; then
-		case "$current_os" in
-			Linux)
-				current_epochtime="$(date +'%s')"
-				adjusted_epochtime=$(( $current_epochtime - $clock_minus_minutes * 60 ))
-				adjusted_end_timestamp="$( date -d $adjusted_epochtime +$clock_fmt )"
-				;;
-			Darwin)
-				adjusted_end_timestamp="$(date -v -${clock_minus_minutes}M +$clock_fmt)"
-				;;
-		esac
+	end_timestamp=""
+	if ! [ -z "$clock_in_out_timestamp" ]; then
+		end_timestamp="$clock_in_out_timestamp"
 	else
-		adjusted_end_timestamp="$(date +$clock_fmt)"
+		if ! [ -z "$clock_minus_minutes" ]; then
+			case "$current_os" in
+				Linux)
+					current_epochtime="$(date +'%s')"
+					adjusted_epochtime=$(( $current_epochtime - $clock_minus_minutes * 60 ))
+					end_timestamp="$( date -d @$adjusted_epochtime +$clock_fmt )"
+					;;
+				Darwin)
+					end_timestamp="$(date -v -${clock_minus_minutes}M +$clock_fmt)"
+					;;
+			esac
+		else
+			end_timestamp="$(date +$clock_fmt)"
+		fi
 	fi
 
 	# calculate session length based on (adjusted) end timestamp and start timestamp
@@ -406,29 +413,29 @@ if [ "$clock_subfunction" = 'out' ]; then
 		Linux)
 			# timestamp format in clock_fmt
 			start_epochtime="$( date -d "$start_timestamp" +'%s' )" || exit 4
-			end_epochtime="$( date -d "$adjusted_end_timestamp" +'%s' )" || exit 4
+			end_epochtime="$( date -d "$end_timestamp" +'%s' )" || exit 4
 			;;
 		Darwin)
 			start_epochtime="$( date -j -f $clock_fmt "$start_timestamp" +'%s' )" || exit 4
-			end_epochtime="$( date -j -f $clock_fmt "$adjusted_end_timestamp" +'%s' )" || exit 4
+			end_epochtime="$( date -j -f $clock_fmt "$end_timestamp" +'%s' )" || exit 4
 			;;
 	esac
 
 	difference_in_seconds=$(( $end_epochtime - $start_epochtime ))
 
 	# if the difference is negative, inform the user end time is invalid.
-	if printf "$difference_in_seconds" | grep -Eq '^-'; then
-		printf 'Clock-out time\n  ${adjusted_end_timestamp}\n  cannot be earlier than clock-in time\n  ${start_timestamp}\n' && exit 1
+	if printf '%s' "$difference_in_seconds" | grep -Eq '^-'; then
+		printf 'Clock-out time\n  ${end_timestamp}\n  cannot be earlier than clock-in time\n  ${start_timestamp}\n' && exit 1
 	fi
 
 	session_length=$(( $difference_in_seconds / 60 ))
 
-	replaced_record="${adjusted_end_timestamp},${clock_tag},${session_length}"
+	replaced_record="${end_timestamp},${clock_tag},${session_length}"
 	sed -e '$d' $clock_log > $clock_log_tmp || exit 2
 	printf "${replaced_record}\n" >> $clock_log_tmp || exit 2
 	mv $clock_log_tmp $clock_log || exit 2
 
-	printf "\nRecorded full session in\n  ${clock_tag}\n  that lasted for\n  ${session_length} minutes\n  and ended at\n  ${adjusted_end_timestamp}.\n"
+	printf "\nRecorded full session in\n  ${clock_tag}\n  that lasted for\n  ${session_length} minutes\n  and ended at\n  ${end_timestamp}.\n"
 
 	printf '\n'
 	exit 0
@@ -446,7 +453,7 @@ if [ "$clock_subfunction" = 'add' ]; then
 				Linux)
 					current_epochtime="$(date +'%s')"
 					adjusted_epochtime=$(( $current_epochtime - $clock_minus_minutes * 60 ))
-					clock_add_end_timestamp="$( date -d $adjusted_epochtime +$clock_fmt )"
+					clock_add_end_timestamp="$( date -d @$adjusted_epochtime +$clock_fmt )"
 					;;
 				Darwin)
 					clock_add_end_timestamp="$(date -v -${clock_minus_minutes}M +$clock_fmt)"
@@ -468,16 +475,22 @@ if [ "$clock_subfunction" = 'add' ]; then
 fi
 
 #### Perform remove option ####
-if [ "$clock_subfunction" = 'remove' ]; then
+if [ "$clock_subfunction" = 'remove' ] || [ "$clock_subfunction" = 'pop' ]; then
+	clock_verb="${clock_subfunction}"
 	## Guard - Check if current log is pre-remove valid ##
 	if [ -z "$last_line" ]; then
-		printf "No clock record found. Cannot remove any record.\n" >&2 && exit 5
+		printf "No clock record found. Cannot ${clock_verb} any record.\n" >&2 && exit 5
 	fi
 
 	## Remove last log item & print it ##
 	sed -e '$d' $clock_log > $clock_log_tmp || exit 2
 	mv $clock_log_tmp $clock_log || exit 2
-	printf "\nRemoved record\n"
+	if [ "$clock_subfunction" = 'remove' ]; then 
+		clock_verb='Removed'
+	elif [ "$clock_subfunction" = 'pop' ]; then
+		clock_verb='Popped'
+	fi
+	printf "\n${clock_verb} record\n"
 	printf "  ${last_line}\n"
 
 	printf '\n'
@@ -487,6 +500,12 @@ fi
 #### Perform log option ####
 if [ "$clock_subfunction" = 'log' ]; then
 	vi $clock_log
+	exit 0
+fi
+
+#### Perform last option ####
+if [ "$clock_subfunction" = 'last' ]; then
+	printf "${last_line}\n"
 	exit 0
 fi
 
@@ -501,10 +520,10 @@ if [ "$clock_subfunction" = 'past' ]; then
 	case "$current_os" in
 		Linux)
 			current_epochtime="$(date +'%s')"
-			cutoff_epochtime=$(( $current_epochtime - $clock_past_number * 24 * 3600 ))
+			cutoff_epochtime=$(( $current_epochtime - $clock_past_days * 24 * 3600 ))
 			;;
 		Darwin)
-			cutoff_epochtime="$(date -v -${clock_past_number}d +'%s')"
+			cutoff_epochtime="$(date -v -${clock_past_days}d +'%s')"
 			;;
 	esac
 
