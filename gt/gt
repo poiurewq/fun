@@ -173,7 +173,7 @@ _gt_open_resources_from_files() {
 		return
 	fi
 
-	local gt_dir=/Users/qzhang/.gt
+	local gt_dir=GT_ROOTDIR
 	local current_shortcut_file current_shortcut_keypath current_resource current_opening_method_code current_hyphenated_description current_resource_extension
 	local current_resource_no_http
 	local number_of_shortcut_fields=3
@@ -370,7 +370,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Brave Browser' --args --incognito "${bi_shortcut_resources[@]}" || return $?
+			open -na 'Google Chrome' --args --incognito "${bi_shortcut_resources[@]}" || return $?
 		fi
 	fi
 
@@ -389,7 +389,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Brave Browser' --args --profile-directory="Profile 1" "${bp_shortcut_resources[@]}" || return $?
+			open -na 'Google Chrome' --args --profile-directory="Profile 1" "${bp_shortcut_resources[@]}" || return $?
 		fi
 	fi
 
@@ -408,7 +408,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Brave Browser' --args --profile-directory="Default" "${bs_shortcut_resources[@]}" || return $?
+			open -na 'Google Chrome' --args --profile-directory="Default" "${bs_shortcut_resources[@]}" || return $?
 		fi
 	fi
 
@@ -427,7 +427,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Brave Browser' --args --profile-directory="Profile 4" "${bw_shortcut_resources[@]}" || return $?
+			open -na 'Google Chrome' --args --profile-directory="Profile 4" "${bw_shortcut_resources[@]}" || return $?
 		fi
 	fi
 
@@ -446,7 +446,7 @@ _gt_open_resources_from_files() {
 			(( this_method_index++ ))
 		done
 		if [ "$preview_mode" = 'off' ]; then
-			open -na 'Brave Browser' --args --profile-directory="Profile 6" "${bl_shortcut_resources[@]}" || return $?
+			open -na 'Google Chrome' --args --profile-directory="Profile 6" "${bl_shortcut_resources[@]}" || return $?
 		fi
 	fi
 
@@ -480,7 +480,8 @@ _gt_open_resources_from_files() {
 		fi
 		printf "cd to ${cd_shortcut_keypaths[1]//\// -> }${this_method_each_description_display}\n"
 		if [ "$preview_mode" = 'off' ]; then
-			cd "${cd_shortcut_resources[1]}" && ls
+			# the stat | awk prints size (col 8), created date (21,22,24), modified date (13,14,16), and name (28), with date in '%y %b %d' format
+			cd "${cd_shortcut_resources[1]}" && stat * | awk 'BEGIN {OFS=""; print "size\tcreated      modified     name";} {printf "%s\t%s %s %02d    %s %s %02d    ", $8, substr($24,3,length($24)-3), substr($21,2), $22, substr($16,3,length($16)-3), substr($13,2), $14; for (i = 1; i <= 27; i++) $i = ""; print $0;}'
 		fi
 	fi
 	## then open all appropriate files using vim
@@ -507,7 +508,7 @@ _gt_open_resources_from_files() {
 gt() {
 	local test_on; test_on=true
 	local exit_report; exit_report=true
-	local gt_helper_absolute_path; gt_helper_absolute_path='/Users/qzhang/.qrc/scripts/_gt_helper'
+	local gt_helper_absolute_path; gt_helper_absolute_path='GT_HELPER_ABSPATH'
 
 	if [ "$1" = "-h" ]; then
 		# we currently do not pipe it into less as some users might not know how to navigate less.

@@ -2,13 +2,13 @@
 
 set -v
 
-cp ~/.qrc/functions/gt .
-cp ~/.qrc/scripts/_gt_helper .
-cp ~/.qrc/completions/_gt .
+cp ~/.qrc/function/gt .
+cp ~/.qrc/script/_gt_helper .
+cp ~/.qrc/completion/_gt .
 
-sed -i '' 's|/Users/qzhang/.qrc/scripts/_gt_helper|GT_HELPER_ABSPATH|' gt
+sed -i '' 's|/Users/qzhang/.qrc/script/_gt_helper|GT_HELPER_ABSPATH|' gt
 sed -i '' 's|/Users/qzhang/.gt|GT_ROOTDIR|' gt
-sed -i '' 's|/Users/qzhang/.qrc/scripts/_gt_helper|GT_HELPER_ABSPATH|' _gt
+sed -i '' 's|/Users/qzhang/.qrc/script/_gt_helper|GT_HELPER_ABSPATH|' _gt
 sed -i '' 's|/Users/qzhang/.gt|GT_ROOTDIR|' _gt
 sed -i '' 's|,.wf|    |' _gt_helper
 sed -i '' '/\.md/d' _gt_helper

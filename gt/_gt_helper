@@ -10,9 +10,10 @@ uf=$(tput smul)
 read -d '' GT_SYN_VAR << GT_SYNOPSIS
      ${bf}gt${nf}
         [[${bf}-p${nf}] [${bf}-i${nf}] ${uf}keypath${nf}]
+        [${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]]
         [${bf}-s${nf} ${uf}keypath${nf}]
         [${bf}-t${nf} [${uf}keypath${nf}]]
-        [${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]]
+        [${bf}-d${nf} [${bf}-r${nf}] ${uf}keypath${nf}]
         [${bf}-a${nf} ${uf}key${nf} ${uf}keypath${nf}]
                 [${bf}-u${nf} ${uf}keypath${nf}]
         [${bf}-n${nf} ${uf}key${nf} {${uf}resource${nf}|${bf}here${nf} [${uf}file${nf}]}
@@ -40,16 +41,19 @@ ${bf}DESCRIPTION${nf}
      Options include:
 
      [${bf}-p${nf}] [${bf}-i${nf}] ${uf}keypath${nf}
-             Open the resource specified by the ${uf}keypath${nf}. A ${uf}keypath${nf} consists of space-separated ${uf}keys${nf}, each of which functions as a user-defined shortcut to a resource, a parent for several children keys, or both. If the ${bf}-p${nf} option is given, then ${bf}gt${nf} shows a preview of the files to be opened but does not actually open them. If the ${bf}-i${nf} option is given, then ${bf}gt${nf} always opens the resource of the shortcut itself as long as it is defined and ignores any do-not-open or children-opening specifiers.
+             Open the resource specified by the ${uf}keypath${nf}. A ${uf}keypath${nf} consists of space-separated ${uf}keys${nf}, each of which functions as a user-defined shortcut to a resource, a parent for several children keys, or both. If a ${uf}keypath${nf} matches multiple shortcuts, ${bf}gt${nf} prefers the shortcut with the shorter absolute keypath (that is, the one that is shallower in the shortcuts tree). If the ${bf}-p${nf} option is given, then ${bf}gt${nf} shows a preview of the files to be opened but does not actually open them. If the ${bf}-i${nf} option is given, then ${bf}gt${nf} always opens the resource of the shortcut itself as long as it is defined and ignores any do-not-open or children-opening specifiers.
+
+     ${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]
+             Print help page. Optionally add ${bf}e${nf} to show examples and exit codes. Optionally add ${bf}i${nf} to show internal API.
 
      ${bf}-s${nf} ${uf}keypath${nf}
              Show all information about ${uf}keypath${nf}.
 
+     ${bf}-d${nf} [${bf}-r${nf}] ${uf}keypath${nf}
+             Delete shortcut at keypath. By default, if this keypath has any children, the children are not deleted but are moved to the shortcut's parent. If ${bf}-r${nf} is given, then all its children and their children in turn will be recursively deleted.
+
      ${bf}-t${nf} [${uf}keypath${nf}]
              Display the full shortcuts hierarchy as a tree with the description, if any, of each shortcut. If ${uf}keypath${nf} is given, displays the shortcuts hierarchy starting at the matched shortcut.
-
-     ${bf}-h${nf} [${bf}e${nf}] [${bf}i${nf}]
-             Print help page. Optionally add ${bf}e${nf} to show examples and exit codes. Optionally add ${bf}i${nf} to show internal API.
 
      ${bf}-a${nf} ${uf}key${nf} ${uf}keypath${nf} [${bf}-u${nf} ${uf}keypath${nf}]
              Create a new ${uf}key${nf} as an alias for an existing shortcut specified by the ${uf}keypath${nf}. Optionally specify the ${uf}keypath${nf} of an existing shortcut that will become the parent of the new alias.
@@ -80,18 +84,12 @@ ${bf}DESCRIPTION${nf}
                      ${bf}file${nf} 
                              -        open file based on the extension:
                                               no-extension,.csv        vim
-                                              .txt,.rtf,.rtfd,.wf      TextEdit
-                                              .md                      personal account on Brave Browser since it has markdown viewer
+                                              .txt,.rtf,.rtfd          TextEdit
 
                      ${bf}directory${nf}
                              ${uf}cd${nf}       cd to the directory and print a list of its files
 
                      ${bf}link${nf}
-                             ${uf}bi${nf}       open web link in incognito on Brave Browser
-                             bp       open web link in personal account on Brave Browser
-                             bs       open web link in school account on Brave Browser
-                             bw       open web link in (pm) work account on Brave Browser
-                             bl       open web link in (lc) work account on Brave Browser
 
              In addition to the above opening methods, ${bf}gt${nf} can recursively open first-layer children shortcuts if one of the following codes is appended to the opening method code for the shortcut itself. Children shortcuts that have an opening method of 'n' are still excluded. ${bf}gt${nf} will refuse to open any child shortcut if there are more than one directory shortcuts, since \`cd' cannot go to two places at once.
                              +ca      recursively open all children shortcuts by their respective opening methods, excluding any shortcut that has an opening method of 'n'
@@ -156,6 +154,7 @@ ${bf}EXIT STATUS${nf}
      9     Cannot move a shortcut under itself or its child.
      10    Shortcut has an empty resource so cannot be opened.
      11    Cannot create symlink.
+     12    Deletion failed.
 GT_EXIT_STATUS
 
 helper_script_name="$( basename ${ZSH_ARGZERO} )"
@@ -198,6 +197,7 @@ if [ "$1" = "-h" ]; then
 	exit 0
 fi
 
+## Define and set up root dir ##
 gt_dir="$HOME/.gt"
 if ! [ -d "${gt_dir}" ]; then
 	mkdir "${gt_dir}"
@@ -209,6 +209,7 @@ report_variable() {
 	if [ "$test_on" = true ]; then printf >&2 "${varname}: ${(P)varname}\n"; fi
 }
 
+# Almost ALWAYS perform an exit code guard-check for any exit code other than 100 (for directory mode) or 200 (for subkey mode) after calling this function. Exception in the code completion method.
 # input:
 # 	mode - keyword specifying which mode we're in. this is an internally-passed keyword.
 #		directory - in this mode we'll return error code and output any error message via fd2, or printf the absolute path to the shortcut's directory if it is uniquely found and return 100.
@@ -239,24 +240,34 @@ get_shortcut_at_keypath() {
 		
 		if [ "${#found_resource_dirs}" -gt 1 ]; then	
 			# Look first for exact match. If so, short-circut-pass it to caller.
+			# Next, pick the shortest-path valid match.
+			found_path_count=1
+			shortest_found_path=""
 			for each_found_path in "${found_resource_dirs[@]}"; do
 				if [ "$each_found_path" = "$keypath_exact_dir_path" ]; then
 					exact_match=true
 					break 2 # break out of nested for-loops
 				fi
+				# set shortest found path
+				if [ $found_path_count -eq 1 ]; then
+					shortest_found_path="$each_found_path"
+				elif [ "${#each_found_path}" -lt "${#shortest_found_path}" ]; then
+					shortest_found_path="$each_found_path"
+				fi
+				(( found_path_count += 1 ))
 			done
 
-			if [ "$mode" = "directory" ]; then
-				printf >&2 "Found multiple matches for keypath '${keypath}':\n"
-				for each_found_path in "${found_resource_dirs[@]}"; do
-					trimmed_found_path="${each_found_path#${gt_dir}/}"
-					printf >&2 "\t${trimmed_found_path//\// }\n"
-				done
-				printf >&2 'Please specify a unique keypath to the desired shortcut.\n'
+			if ! [ -z "$shortest_found_path" ]; then
+				#report_variable shortest_found_path
+				under_dir="$shortest_found_path"
+			else
+				printf >&2 "Something went wrong in finding the shortest match for keypath '${keypath}'\n" && exit 2
 			fi
-			return 2
+
+		elif [ "${#found_resource_dirs}" -eq 1 ]; then
+			under_dir="${found_resource_dirs[1]}"
 		fi
-		under_dir="${found_resource_dirs[1]}"
+
 	done
 	if [ "$exact_match" = "true" ]; then
 		shortcut_dir="$keypath_exact_dir_path"
@@ -276,7 +287,7 @@ get_shortcut_at_keypath() {
 		return 100
 	elif [ "$mode" = "subkeys" ]; then
 		local subkeys
-		subkeys=( $( cd "$shortcut_dir" && find * -maxdepth 0 -type d -or maxdepth 0 -type l ) )
+		subkeys=( $( cd "$shortcut_dir" && find * -maxdepth 0 -type d -or -maxdepth 0 -type l ) )
 		echo "${subkeys[@]}"
 		return 200
 	fi
@@ -417,7 +428,7 @@ while ! [ -z "$1" ]; do
 				keypath_output="${truncated_parent_dir//\// -> }"
 			fi
 			keypath_output+=" -> $key"
-			printf >&2 "added ${shortcut_output} ${description_output}${opening_method_output}at $keypath_output\n"
+			printf >&2 "Added ${shortcut_output} ${description_output}${opening_method_output}at $keypath_output\n"
 			exit 0
 			;;
 
@@ -535,7 +546,8 @@ while ! [ -z "$1" ]; do
 						fi
 						#report_variable new_parent_dir
 						#report_variable ste_folder
-						if [ "${new_parent_dir#${ste_folder}}" != "${new_parent_dir}" ]; then
+						# make sure to append / after ste_folder to test whether parent dir falls under shortcut
+						if [ "${new_parent_dir#${ste_folder}/}" != "${new_parent_dir}" ]; then
 							printf >&2 "The shortcut cannot be placed under the specified parent since the parent is either a child of the shortcut or the shortcut itself.\n"
 							exit 9
 						fi
@@ -691,6 +703,95 @@ while ! [ -z "$1" ]; do
 		-c) # called by `_gt` completer as `_gt_helper -c keypath`
 			get_shortcut_at_keypath subkeys "${@:2}"
 			exit $?
+			;;
+
+		-d) # called by `gt` as `_gt_helper -d [-r] keypath`
+			if [ -z "$2" ]; then
+				printf >&2 'Please provide a second argument according to `gt -d [-r] <keypath>`\n' && exit 254
+			fi
+			
+			if [ "$2" = '-r' ]; then
+				deletion_mode='recursive'
+				dir_to_delete="$( get_shortcut_at_keypath directory ${@:3} )"
+				exit_code=$?
+				if [ $exit_code -ne 100 ] && [ $exit_code -ne 0 ]; then
+					exit $exit_code
+				fi
+			else
+				deletion_mode='hoist'
+				dir_to_delete="$( get_shortcut_at_keypath directory ${@:2} )"
+				exit_code=$?
+				if [ $exit_code -ne 100 ] && [ $exit_code -ne 0 ]; then
+					exit $exit_code
+				fi
+
+				shortcut_children=( $(get_shortcut_at_keypath subkeys ${@:2}) )
+				exit_code=$?
+				if [ $exit_code -ne 200 ] && [ $exit_code -ne 0 ]; then
+					exit $exit_code
+				fi
+			fi
+
+			shortcut_key="$( basename $dir_to_delete )"
+			file_to_delete="${dir_to_delete}/${shortcut_key}.gt"
+
+			if [ $deletion_mode = 'hoist' ]; then
+				if [ -z "${shortcut_children}" ]; then
+					printf >&2 "Deleting %s with the following fields:\n" "${bf}${shortcut_key}${nf}"
+					awk 'NR == 1 { print "Resource:   ", $0 } NR == 2 { print "Opener:     ", $0 } NR == 3 { print "Description:", $0 }' $file_to_delete >&2 
+					/bin/rm $file_to_delete || exit 12
+					/bin/rmdir $dir_to_delete || exit 12
+					printf >&2 "Shortcut %s deleted.\n" "${bf}${shortcut_key}${nf}"
+					exit 0
+				else
+					parent_dir="$( dirname ${dir_to_delete%/} )"
+					if [ "${parent_dir}" = "${gt_dir}" ]; then
+						parent_name='root'
+					else
+						trimmed_parent_dir="${parent_dir#${gt_dir}/}"
+						parent_name="${trimmed_parent_dir//\// -> }"
+					fi
+					printf >&2 "Shortcut %s has children %s, which will be hoisted to its parent shortcut %s.\n" \
+						"${bf}${shortcut_key}${nf}" \
+						"${bf}${shortcut_children}${nf}" \
+						"${bf}${parent_name}${nf}"
+ 					for each_child_dir in $( find $dir_to_delete/* -maxdepth 0 -type d -or -maxdepth 0 -type l ); do
+						/bin/mv $each_child_dir $parent_dir
+						trimmed_child_dir="${each_child_dir#${gt_dir}/}"
+						old_child_display="${trimmed_child_dir//\// -> }"
+						new_child_display="${parent_name} -> $( basename ${each_child_dir%/} )"
+						printf >&2 '%s moved to %s\n' "${bf}${old_child_display}${nf}" "${bf}${new_child_display}${nf}"
+					done
+					printf >&2 "Deleting %s with the following fields:\n" "${bf}${shortcut_key}${nf}"
+					awk 'NR == 1 { print "Resource:   ", $0 } NR == 2 { print "Opener:     ", $0 } NR == 3 { print "Description:", $0 }' $file_to_delete >&2 
+					/bin/rm $file_to_delete || exit 12
+					/bin/rmdir $dir_to_delete || exit 12
+					printf >&2 "Shortcut %s deleted.\n" "${bf}${shortcut_key}${nf}"
+				fi
+			elif [ $deletion_mode = 'recursive' ]; then
+				# since recursive deletion is dangerous, guard-check for empty or dangerous directories
+				if [ -z "$dir_to_delete" ]; then
+					printf >&2 "Invalid empty directory. Deletion aborted.\n" && exit 255
+				elif ! [ -d "$dir_to_delete" ] && ! [ -L "$dir_to_delete" ]; then
+					printf >&2 "Invalid directory '%s'. Deletion aborted.\n" "${dir_to_delete}" && exit 255
+				elif [ "${dir_to_delete#${gt_dir}}" = "${dir_to_delete}" ]; then
+					printf >&2 "Directory '%s' is not a gt directory. Deletion aborted.\n" "${dir_to_delete}" && exit 255
+				fi
+
+				# working from the deepest child leafs upward
+				printf >&2 'Recursively deleting shortcut %s and its children\n\n' "${shortcut_key}"
+				for each_child_dir_to_delete in $( find $dir_to_delete -type d -or -type l | awk '{ print length($0), $0 }' | sort -n -r | cut -d' ' -f2- ); do
+					each_child_file_to_delete="${each_child_dir_to_delete}/$( basename $each_child_dir_to_delete ).gt"
+					trimmed_child_dir="${each_child_dir_to_delete#${gt_dir}/}"
+					child_display="${trimmed_child_dir//\// -> }"
+					printf >&2 "Deleting %s with the following fields:\n" "${bf}${child_display}${nf}"
+					awk 'NR == 1 { print "Resource:   ", $0 } NR == 2 { print "Opener:     ", $0 } NR == 3 { print "Description:", $0 }' $each_child_file_to_delete >&2 
+					/bin/rm $each_child_file_to_delete || exit 12
+					/bin/rmdir $each_child_dir_to_delete || exit 12
+					printf >&2 "Shortcut %s deleted.\n\n" "${bf}${child_display}${nf}"
+				done
+			fi
+			exit 0
 			;;
 
 		-t) # called by `gt` as `_gt_helper -t [keypath]`
@@ -892,7 +993,7 @@ while ! [ -z "$1" ]; do
 			truncated_es_dir="${es_dir#${gt_dir}/}"
 			es_keypath_output="${truncated_es_dir//\// -> }"
 
-			printf >&2 "added new alias to $es_keypath_output at $alias_keypath_output\n"
+			printf >&2 "Added new alias to $es_keypath_output at $alias_keypath_output\n"
 			exit 0
 			;;
 
