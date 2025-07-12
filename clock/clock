@@ -16,7 +16,7 @@ clock_user_facing_fmt='yyyy.mm.dd-HH:MM'
 clock_synopsis_line1='clock'
 clock_synopsis_line2='help [ error ]'
 clock_synopsis_line3='in | out <tag> [ { minus <minutes> } | { at <timestamp> } ]'
-clock_synopsis_line4='add <tag> for <minutes> [ { ended | ending } { { minus <minutes> } | { at <timestamp> } } ]'
+clock_synopsis_line4='add <tag> for <minutes> [ { minus <minutes> } | { at <timestamp> } ]'
 clock_synopsis_line5='remove | pop'
 clock_synopsis_line6='log'
 clock_synopsis_line7='last'
@@ -57,7 +57,7 @@ DESCRIPTION
              Print help page. Optionally add 'error' to see the error codes.
    
      ${clock_synopsis_line3}
-             Clock in to or out from work labeled with a single-word <tag>. Optionally specify the number of <minutes> ago at which the clock in or out happened. Clock automatically calculates the number of minutes in the session and records it to the log. Behind the scenes, clocking in adds a temporary record of the starting time and tag for a session in the format 'started,start time,tag' where 'started' is simply a keyword. This record is then overridden upon clocking out by a permanent record of the format '${CLOCK_HEADER}'.
+             Clock in to or out from work labeled with a single-word <tag>. The <tag> is of the form <top>[.<nextLevel>*] where <top> is a top-level tag and <nextLevel> are next-level tags under the <top> tag. At summary time (see 'past' option), <top> tags are summarized separately. Optionally specify the number of <minutes> ago at which the clock in or out happened. Clock automatically calculates the number of minutes in the session and records it to the log. Behind the scenes, clocking in adds a temporary record of the starting time and tag for a session in the format 'started,start time,tag' where 'started' is simply a keyword. This record is then overridden upon clocking out by a permanent record of the format '${CLOCK_HEADER}'.
    
      ${clock_synopsis_line4}
              Manually add a session of <minutes> length to the log, ending at the time of command call. Optionally specify either the number of <minutes> ago or the <timestamp> at which the session ended. The <timestamp> should be in the format '${clock_user_facing_fmt}'.
@@ -169,30 +169,20 @@ add)
 
 		if ! [ -z "$5" ]; then
 			case "$5" in
-			ended|ending)
-				if [ -z "$6" ]; then printf "Missing 'minus' or 'at' keyword after 'clock $1 $2 $3 $4 $5'\n" >&2 && exit 1; fi
-
-				case "$6" in
-				minus)
-					if [ -z "$7" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 $5 $6 <minutes>'\n" >&2 && exit 1; fi
-					if ! [ -z "$7" ] && ! printf '%s' "$7" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 $5 $6 <minutes>'\n" >&2 && exit 1; fi
-					clock_minus_minutes="$7"
-
-					;;
-
-				at)
-					if [ -z "$7" ]; then printf "Missing <timestamp> in 'clock $1 $2 $3 $4 $5 $6 <timestamp>'\n" >&2 && exit 1; fi
-					if ! [ -z "$7" ] && ! printf '%s' "$7" | grep -Eq '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}:[0-9]{2}$'; then printf "Please provide a valid timestamp in the format '${clock_user_facing_fmt}' for <timestamp> in 'clock $1 $2 $3 $4 $5 $6 <timestamp>'\n" >&2 && exit 1; fi
-					clock_add_end_timestamp="$7"
-
-					;;
-
-				*) 	printf "Unknown suboption '$6' after 'clock $1 $2 $3 $4 $5'\n" >&2 && exit 1
-					;;
-				esac
+			minus)
+				if [ -z "$6" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 $5 <minutes>'\n" >&2 && exit 1; fi
+				if ! [ -z "$6" ] && ! printf '%s' "$6" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 $5 <minutes>'\n" >&2 && exit 1; fi
+				clock_minus_minutes="$6"
 
 				;;
-			
+
+			at)
+				if [ -z "$6" ]; then printf "Missing <timestamp> in 'clock $1 $2 $3 $4 $5 <timestamp>'\n" >&2 && exit 1; fi
+				if ! [ -z "$6" ] && ! printf '%s' "$6" | grep -Eq '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}:[0-9]{2}$'; then printf "Please provide a valid timestamp in the format '${clock_user_facing_fmt}' for <timestamp> in 'clock $1 $2 $3 $4 $5 <timestamp>'\n" >&2 && exit 1; fi
+				clock_add_end_timestamp="$6"
+
+				;;
+
 			*) 	printf "Unknown suboption '$5' after 'clock $1 $2 $3 $4'\n" >&2 && exit 1
 				;;
 			esac
