@@ -216,7 +216,7 @@ past)
 	*)
 		if printf '%s' "$2" | grep -Eq '^[0-9]+$'; then
 
-			if [ -z "$3" ]; then printf "Missing 'day' or 'days' keyword after 'clock $1 $2'\n" >&2 && exit 1; fi
+			if [ -z "$3" ]; then printf "Missing 'days' or 'weeks' keyword after 'clock $1 $2'\n" >&2 && exit 1; fi
 
 			case "$3" in
 			days) 
@@ -253,22 +253,27 @@ if ! [ -f $clock_log ]; then
 fi
 ## Ensure that the clock log always ends with the last non-empty line ##
 clock_log_tmp=${clock_log}.tmp
-if [ -s "$clock_log" ]; then
-	while
-		last_line=$(tail -1 "$clock_log") &&
-		[ -z "$last_line" ] || 
-		printf '%s' "$last_line" | grep -Eq '^ *$' ||
-		printf '%s' "$last_line" | grep -Eq '^	$'
-	do
+# -s checks for file size > 0
+while
+	[ -s "$clock_log" ] && 
+	last_line=$(tail -1 "$clock_log") &&
+	[ -z "$last_line" ] || 
+	printf '%s' "$last_line" | grep -Eq '^ *$' ||
+	printf '%s' "$last_line" | grep -Eq '^	$'
+do
+	if [ $( wc -l "$clock_log" | cut -d' ' -f1 ) -eq 1 ]; then
+		printf "Clearing clock log of unaccounted-for control characters\n"
+		> "$clock_log"
+	else
 		printf "Removing trailing blank line in clock log\n"
 		sed -e '$d' "$clock_log" > $clock_log_tmp || exit 2
 		mv $clock_log_tmp $clock_log || exit 2
-	done
-fi
+	fi
+done
 # At this point the last_line variable should hold the last line content.
 
-#### Perform pre-'in' OR pre-'add' log validity check ####
-if [ "$clock_subfunction" = 'in' ] || [ "$clock_subfunction" = 'add' ]; then
+#### Perform pre-'in' OR pre-'add' OR pre-'past' log validity check ####
+if [ "$clock_subfunction" = 'in' ] || [ "$clock_subfunction" = 'add' ] || [ "$clock_subfunction" = 'past' ]; then
 	# If file is empty skip this guard. 
 	# If file is non-empty and last line is still in 'started' format, then interactively prompt user to give a session length for the started session or remove the partial record.
 	if ! [ -z "$last_line" ] && [ "$(printf "$last_line" | cut -d, -f1)" = 'started' ]; then
