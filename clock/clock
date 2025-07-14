@@ -57,7 +57,8 @@ DESCRIPTION
              Print help page. Optionally add 'error' to see the error codes.
    
      ${clock_synopsis_line3}
-             Clock in to or out from work labeled with a single-word <tag>. The <tag> is of the form <top>[.<nextLevel>*] where <top> is a top-level tag and <nextLevel> are next-level tags under the <top> tag. At summary time (see 'past' option), <top> tags are summarized separately. Optionally specify the number of <minutes> ago at which the clock in or out happened. Clock automatically calculates the number of minutes in the session and records it to the log. Behind the scenes, clocking in adds a temporary record of the starting time and tag for a session in the format 'started,start time,tag' where 'started' is simply a keyword. This record is then overridden upon clocking out by a permanent record of the format '${CLOCK_HEADER}'.
+             Clock in to or out from work labeled with a single-word <tag>. The <tag> is of the form <top>[.<nextLevel>*] where <top> is a top-level tag and <nextLevel> are next-level tags under the <top> tag. At summary time (see 'past' option), <top> tags are summarized in a dedicated section. Optionally specify the number of <minutes> ago at which the clock in or out happened. Clock automatically calculates the number of minutes in the session and records it to the log.
+             Clock always records time in the locally-set time zone. Behind the scenes, clocking in adds a temporary record of the starting time and tag for a session in the format 'started,start time,tag' where 'started' is simply a keyword. This record is then overridden upon clocking out by a permanent record of the format '${CLOCK_HEADER}'.
    
      ${clock_synopsis_line4}
              Manually add a session of <minutes> length to the log, ending at the time of command call. Optionally specify either the number of <minutes> ago or the <timestamp> at which the session ended. The <timestamp> should be in the format '${clock_user_facing_fmt}'.
@@ -135,7 +136,7 @@ in|out)
 		minus)
 			if [ -z "$4" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 <minutes>'\n" >&2 && exit 1; fi
 			if ! [ -z "$4" ] && ! printf '%s' "$4" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 <minutes>'\n" >&2 && exit 1; fi
-			clock_minus_minutes="$4"
+			clock_minus_minutes=$4
 			;;
 
 		at)
@@ -172,7 +173,7 @@ add)
 			minus)
 				if [ -z "$6" ]; then printf "Missing <minutes> in 'clock $1 $2 $3 $4 $5 <minutes>'\n" >&2 && exit 1; fi
 				if ! [ -z "$6" ] && ! printf '%s' "$6" | grep -Eq '^[0-9]+$'; then printf "Please provide a positive integer for <minutes> in 'clock $1 $2 $3 $4 $5 <minutes>'\n" >&2 && exit 1; fi
-				clock_minus_minutes="$6"
+				clock_minus_minutes=$6
 
 				;;
 
@@ -262,10 +263,10 @@ while
 	printf '%s' "$last_line" | grep -Eq '^	$'
 do
 	if [ $( wc -l "$clock_log" | cut -d' ' -f1 ) -eq 1 ]; then
-		printf "Clearing clock log of unaccounted-for control characters\n"
+		printf "\nClearing clock log of unaccounted-for control characters\n"
 		> "$clock_log"
 	else
-		printf "Removing trailing blank line in clock log\n"
+		printf "\nRemoving trailing blank line in clock log\n"
 		sed -e '$d' "$clock_log" > $clock_log_tmp || exit 2
 		mv $clock_log_tmp $clock_log || exit 2
 	fi
